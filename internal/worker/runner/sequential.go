@@ -44,6 +44,8 @@ func Permanent(
 	return fmt.Errorf("%w: %w", ErrPermanent, err)
 }
 
+func isPermanent(err error) bool { return errors.Is(err, ErrPermanent) }
+
 // livro:inicio sequential
 
 // Sequential é o executor do M0: pega um job, executa, registra o
@@ -77,27 +79,7 @@ func (s *Sequential) Drain(ctx context.Context) (int, error) {
 }
 
 func (s *Sequential) executar(ctx context.Context, j job.Job) error {
-	h, ok := s.Handlers[j.Kind]
-	if !ok {
-		return s.Queue.Fail(
-			j.ID,
-			s.Now(),
-			"kind sem handler: "+j.Kind,
-			true,
-			time.Time{},
-		)
-	}
-	if err := h(ctx, j); err != nil {
-		agora := s.Now()
-		return s.Queue.Fail(
-			j.ID,
-			agora,
-			err.Error(),
-			errors.Is(err, ErrPermanent),
-			agora.Add(s.RetryDelay),
-		)
-	}
-	return s.Queue.Complete(j.ID, s.Now())
+	return executar(ctx, s.Queue, s.Handlers, j, s.Now, s.RetryDelay)
 }
 
 // livro:fim sequential
