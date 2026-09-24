@@ -21,6 +21,10 @@ type Notificador struct {
 	enviadas   int
 	assinantes map[string]chan string
 	token      string
+
+	fim    chan struct{}  // fechado por Fechar
+	fundo  sync.WaitGroup // rotinas de fundo
+	fechar sync.Once
 }
 
 // Novo cria o serviço e inicia as rotinas de fundo.
@@ -35,9 +39,10 @@ func Novo(
 		metricas:   metricas,
 		assinantes: map[string]chan string{},
 		token:      renovar(),
+		fim:        make(chan struct{}),
 	}
-	go n.renovarToken(ctx, renovar)
-	go n.publicarMetricas()
+	n.fundo.Go(func() { n.renovarToken(ctx, renovar) })
+	n.fundo.Go(n.publicarMetricas)
 	return n
 }
 
@@ -50,7 +55,11 @@ func (n *Notificador) Enviar(
 	ctx context.Context,
 	destino, msg string,
 ) error {
-	resultados := make(chan error)
+	// o primeiro sucesso cancela os demais
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	// todo envio completa
+	resultados := make(chan error, len(n.provedores))
 	for _, p := range n.provedores {
 		go func() { resultados <- p(ctx, destino, msg) }()
 	}
@@ -78,11 +87,15 @@ func (n *Notificador) Assinar(nome string, receber func(string)) {
 	}()
 }
 
-// Cancelar remove o assinante.
+// Cancelar remove o assinante e fecha o canal dele: é o fechamento que
+// termina o range da goroutine de entrega.
 func (n *Notificador) Cancelar(nome string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	delete(n.assinantes, nome)
+	if c, ok := n.assinantes[nome]; ok {
+		close(c)
+		delete(n.assinantes, nome)
+	}
 }
 
 // Publicar entrega um evento a todos os assinantes.
@@ -102,11 +115,19 @@ func (n *Notificador) Token() string {
 }
 
 func (n *Notificador) renovarToken(
-	_ context.Context,
+	ctx context.Context,
 	renovar func() string,
 ) {
+	tique := time.NewTicker(50 * time.Millisecond)
+	defer tique.Stop()
 	for {
-		<-time.After(50 * time.Millisecond)
+		select {
+		case <-tique.C:
+		case <-ctx.Done():
+			return
+		case <-n.fim:
+			return
+		}
 		t := renovar()
 		n.mu.Lock()
 		n.token = t
@@ -115,7 +136,14 @@ func (n *Notificador) renovarToken(
 }
 
 func (n *Notificador) publicarMetricas() {
-	for range time.NewTicker(20 * time.Millisecond).C {
+	tique := time.NewTicker(20 * time.Millisecond)
+	defer tique.Stop()
+	for {
+		select {
+		case <-tique.C:
+		case <-n.fim:
+			return
+		}
 		n.mu.Lock()
 		e := n.enviadas
 		n.mu.Unlock()
@@ -123,5 +151,17 @@ func (n *Notificador) publicarMetricas() {
 	}
 }
 
-// Fechar encerra o serviço.
-func (n *Notificador) Fechar() {}
+// Fechar encerra o serviço: para as rotinas de fundo, espera por elas e
+// encerra as assinaturas restantes.
+func (n *Notificador) Fechar() {
+	n.fechar.Do(func() {
+		close(n.fim)
+		n.fundo.Wait()
+		n.mu.Lock()
+		defer n.mu.Unlock()
+		for nome, c := range n.assinantes {
+			close(c)
+			delete(n.assinantes, nome)
+		}
+	})
+}
