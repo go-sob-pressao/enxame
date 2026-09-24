@@ -9,7 +9,7 @@ LDFLAGS := -s -w -X main.versao=$(VERSAO)
 PKGS    := ./...
 
 .DEFAULT_GOAL := help
-.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto clean
+.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto clean defeitos
 
 help:            ## lista os alvos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -55,6 +55,9 @@ integration:     ## integração contra Postgres real (make up; ENXAME_DB_DSN)
 
 fuzz:            ## fuzzing de 30s por alvo (Cap. 13)
 	@$(GO) test -list '^Fuzz' $(PKGS) | grep -E '^Fuzz' || echo "fuzz: SKIP — nenhum alvo ainda; entram no Capítulo 13"
+
+defeitos:        ## reproduz os defeitos dos exemplos (build tag defeito; fora da CI)
+	$(GO) test -count=1 -tags defeito ./examples/...
 
 cover:           ## relatório de cobertura em HTML
 	$(GO) test -coverprofile=coverage.out $(PKGS)
