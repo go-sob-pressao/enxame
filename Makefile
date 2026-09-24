@@ -57,7 +57,7 @@ fuzz:            ## fuzzing de 30s por alvo (Cap. 13)
 	@$(GO) test -list '^Fuzz' $(PKGS) | grep -E '^Fuzz' || echo "fuzz: SKIP — nenhum alvo ainda; entram no Capítulo 13"
 
 defeitos:        ## reproduz os defeitos dos exemplos (build tag defeito; fora da CI)
-	$(GO) test -count=1 -tags defeito ./examples/...
+	$(GO) test -count=1 -short -tags defeito ./examples/...
 
 cover:           ## relatório de cobertura em HTML
 	$(GO) test -coverprofile=coverage.out $(PKGS)
