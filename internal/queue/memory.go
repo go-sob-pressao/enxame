@@ -24,6 +24,8 @@ type Memory struct {
 	mu      sync.Mutex
 	jobs    map[id.JobID]job.Job
 	history map[id.JobID][]job.Event
+	// fechado e substituído a cada mudança (Cap. 5)
+	mudou chan struct{}
 }
 
 // NewMemory cria uma fila vazia.
@@ -31,7 +33,21 @@ func NewMemory() *Memory {
 	return &Memory{
 		jobs:    map[id.JobID]job.Job{},
 		history: map[id.JobID][]job.Event{},
+		mudou:   make(chan struct{}),
 	}
+}
+
+// Changed devolve um canal que é fechado na próxima mudança da fila.
+func (m *Memory) Changed() <-chan struct{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.mudou
+}
+
+// avisar acorda todos os que esperam em Changed. Chamar com mu travado.
+func (m *Memory) avisar() {
+	close(m.mudou)
+	m.mudou = make(chan struct{})
 }
 
 // livro:fim memory
@@ -43,6 +59,9 @@ func (m *Memory) gravar(j job.Job, evs []job.Event) (job.Job, error) {
 	}
 	m.jobs[j.ID] = j
 	m.history[j.ID] = append(m.history[j.ID], evs...)
+	if j.State == job.StateAvailable {
+		m.avisar()
+	}
 	return j, nil
 }
 
