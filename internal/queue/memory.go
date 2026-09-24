@@ -170,8 +170,9 @@ func (m *Memory) Promote(at time.Time) (int, error) {
 	defer m.mu.Unlock()
 	n := 0
 	for _, j := range m.jobs {
-		if (j.State == job.StateScheduled || j.State == job.StateRetryable) &&
-			!at.Before(j.ScheduledAt) {
+		emEspera := j.State == job.StateScheduled ||
+			j.State == job.StateRetryable
+		if emEspera && !at.Before(j.ScheduledAt) {
 			evs, err := job.MakeAvailable(j, at)
 			if err != nil {
 				return n, err

@@ -13,6 +13,7 @@ linters:
     - fatcontext
     - forbidigo
     - intrange
+    - lll
     - modernize
     - nilerr
     - noctx
@@ -23,6 +24,10 @@ linters:
     - usestdlibvars
     - wastedassign
   settings:
+    lll:
+      # As listagens do livro têm no máximo 72 colunas (Plano Mestre §16.7).
+      line-length: 72
+      tab-width: 4
     forbidigo:
       forbid:
         # Anti-Pattern #4 — o livro o transforma em regra executável.
@@ -40,6 +45,10 @@ linters:
     rules:
       - path: _test\.go
         linters: [errcheck]
+      # Testes e ferramentas raramente viram listagem; quando viram, o filtro
+      # de inclusão do livro barra a linha longa.
+      - path: (_test\.go|^tools/)
+        linters: [lll]
       # A proibição de time.Sleep vale só para teste.
       - path-except: _test\.go
         linters: [forbidigo]

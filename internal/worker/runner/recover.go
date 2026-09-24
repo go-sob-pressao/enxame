@@ -14,7 +14,9 @@ type PanicError struct {
 	Stack []byte
 }
 
-func (e *PanicError) Error() string { return fmt.Sprintf("pânico no handler: %v", e.Value) }
+func (e *PanicError) Error() string {
+	return fmt.Sprintf("pânico no handler: %v", e.Value)
+}
 
 // livro:inicio recover
 

@@ -31,9 +31,11 @@ const (
 
 var nomesDeEvento = [...]string{
 	EventInserted: "JobInserted", EventScheduled: "JobScheduled",
-	EventMadeAvailable: "JobMadeAvailable", EventAttemptStart: "AttemptStarted",
-	EventHeartbeat: "AttemptHeartbeat", EventAttemptFailed: "AttemptFailed",
-	EventCompleted: "JobCompleted", EventDiscarded: "JobDiscarded",
+	EventMadeAvailable: "JobMadeAvailable",
+	EventAttemptStart:  "AttemptStarted",
+	EventHeartbeat:     "AttemptHeartbeat",
+	EventAttemptFailed: "AttemptFailed",
+	EventCompleted:     "JobCompleted", EventDiscarded: "JobDiscarded",
 	EventCancelled: "JobCancelled", EventRescued: "JobRescued",
 }
 

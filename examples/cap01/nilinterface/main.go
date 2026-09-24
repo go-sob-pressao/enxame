@@ -6,7 +6,9 @@ import "fmt"
 // ErroValidacao descreve um campo inválido.
 type ErroValidacao struct{ Campo string }
 
-func (e *ErroValidacao) Error() string { return "campo inválido: " + e.Campo }
+func (e *ErroValidacao) Error() string {
+	return "campo inválido: " + e.Campo
+}
 
 func main() {
 	if err := validar("Ana"); err != nil {

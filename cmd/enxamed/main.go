@@ -3,7 +3,7 @@
 // Um único binário hospeda os papéis — api, worker, scheduler, delivery
 // e cluster. Quais ficam ativos é decidido pela configuração (ADR-008).
 //
-//	enxamed -demo 5     executa o M0: cinco jobs, um processo, um por vez
+//	enxamed -demo 5    executa o M0: cinco jobs, um por vez
 //	enxamed -version
 package main
 

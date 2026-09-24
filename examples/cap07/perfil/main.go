@@ -2,8 +2,8 @@
 // execução.
 //
 //	go run ./examples/cap07/perfil &
-//	curl -s 'localhost:6060/debug/pprof/goroutineleak?debug=1' | head -30
-//	curl -s 'localhost:6060/debug/pprof/goroutine?debug=1'     | head -30
+//	curl -s 'localhost:6060/debug/pprof/goroutineleak?debug=1'
+//	curl -s 'localhost:6060/debug/pprof/goroutine?debug=1'
 //
 // O perfil de goroutines lista TODAS; o goroutineleak lista as
 // bloqueadas numa primitiva que nenhuma goroutine viva alcança mais —
@@ -49,7 +49,8 @@ func main() {
 		vazarEmGlobal()
 	}
 	fmt.Println(
-		"100 vazamentos locais e 100 em variável global; perfis em localhost:6060/debug/pprof/",
+		"100 vazamentos locais e 100 em variável global;",
+		"perfis em localhost:6060/debug/pprof/",
 	)
 	srv := &http.Server{
 		Addr:              "localhost:6060",

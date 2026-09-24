@@ -6,8 +6,9 @@
 //	GOOS=linux go build -o /tmp/gmp ./examples/cap03/gomaxprocs
 //	docker run --rm --cpus=2 -v /tmp/gmp:/gmp busybox /gmp
 //	    NumCPU=8 GOMAXPROCS=2
-//	docker run --rm --cpus=2 -e GODEBUG=containermaxprocs=0 -v /tmp/gmp:/gmp busybox /gmp
-//	    NumCPU=8 GOMAXPROCS=8     (o comportamento anterior ao Go 1.25)
+//	docker run --rm --cpus=2 -e GODEBUG=containermaxprocs=0 \
+//	    -v /tmp/gmp:/gmp busybox /gmp
+//	    NumCPU=8 GOMAXPROCS=8   (como antes do Go 1.25)
 package main
 
 import (
