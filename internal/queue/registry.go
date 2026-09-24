@@ -1,34 +1,50 @@
 package queue
 
-import "time"
+import (
+	"maps"
+	"sync"
+	"sync/atomic"
+	"time"
+)
 
-// QueueConfig é a configuração de uma fila, recarregável sem reiniciar.
-type QueueConfig struct {
+// Config é a configuração de uma fila, recarregável sem reiniciar.
+type Config struct {
 	Concurrency int
 	PollTimeout time.Duration
 }
 
-// livro:inicio registry-corrida
+// livro:inicio registry-corrigido
 
-// Registry guarda a configuração corrente de cada fila. O
-// recarregamento de configuração chama Set; cada pool chama Get a cada
-// ciclo de busca.
+// Registry guarda a configuração corrente de cada fila. Leituras são
+// muito mais frequentes que recarregamentos, então o mapa é imutável
+// depois de publicado: Set copia, altera a cópia e publica o novo mapa
+// inteiro com atomic.Pointer; Get lê sem trava nenhuma.
 type Registry struct {
-	filas map[string]QueueConfig
+	// serializa os Set: dois recarregamentos não se perdem
+	escrita sync.Mutex
+	filas   atomic.Pointer[map[string]Config]
 }
 
 // NewRegistry cria um registro vazio.
 func NewRegistry() *Registry {
-	return &Registry{filas: map[string]QueueConfig{}}
+	r := &Registry{}
+	r.filas.Store(&map[string]Config{})
+	return r
 }
 
 // Set grava a configuração de uma fila.
-func (r *Registry) Set(nome string, c QueueConfig) { r.filas[nome] = c }
+func (r *Registry) Set(nome string, c Config) {
+	r.escrita.Lock()
+	defer r.escrita.Unlock()
+	novo := maps.Clone(*r.filas.Load())
+	novo[nome] = c
+	r.filas.Store(&novo)
+}
 
 // Get devolve a configuração de uma fila.
-func (r *Registry) Get(nome string) (QueueConfig, bool) {
-	c, ok := r.filas[nome]
+func (r *Registry) Get(nome string) (Config, bool) {
+	c, ok := (*r.filas.Load())[nome]
 	return c, ok
 }
 
-// livro:fim registry-corrida
+// livro:fim registry-corrigido

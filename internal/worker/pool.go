@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -43,11 +44,11 @@ type Pool struct {
 	Now            func() time.Time
 	Log            *slog.Logger
 
-	stats   Stats
-	rodando bool
+	executados, falhas, panicos atomic.Int64
+	rodando                     atomic.Bool
 }
 
-// livro:inicio stats-corrida
+// livro:inicio stats-corrigido
 
 // Stats são os contadores do pool, para métricas e para o painel.
 type Stats struct {
@@ -56,13 +57,22 @@ type Stats struct {
 	Panics   int64 // tentativas que entraram em pânico
 }
 
-// Stats devolve uma cópia dos contadores.
-func (p *Pool) Stats() Stats { return p.stats }
+// Stats devolve um retrato dos contadores. Cada contador é lido de
+// forma atômica; o retrato como um todo não é — Executed pode incluir
+// uma tentativa cuja falha ainda não entrou em Failed. Para um painel,
+// basta.
+func (p *Pool) Stats() Stats {
+	return Stats{
+		Executed: p.executados.Load(),
+		Failed:   p.falhas.Load(),
+		Panics:   p.panicos.Load(),
+	}
+}
 
 // Running informa se o pool está executando — a probe de saúde usa.
-func (p *Pool) Running() bool { return p.rodando }
+func (p *Pool) Running() bool { return p.rodando.Load() }
 
-// livro:fim stats-corrida
+// livro:fim stats-corrigido
 
 // ErrAttemptTimeout é a causa registrada quando a tentativa estoura o
 // prazo.
@@ -74,8 +84,8 @@ var ErrAttemptTimeout = errors.New("tentativa excedeu o prazo")
 // busca; Concurrency workers executam; o errgroup propaga o primeiro
 // erro e cancela os demais.
 func (p *Pool) Run(ctx context.Context) error {
-	p.rodando = true
-	defer func() { p.rodando = false }()
+	p.rodando.Store(true)
+	defer p.rodando.Store(false)
 	jobs := make(chan job.Job)
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -169,11 +179,11 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	case <-tentativa.Done():
 		err = context.Cause(tentativa)
 	}
-	p.stats.Executed++
+	p.executados.Add(1)
 	if err != nil {
-		p.stats.Failed++
+		p.falhas.Add(1)
 		if _, ok := errors.AsType[*runner.PanicError](err); ok {
-			p.stats.Panics++
+			p.panicos.Add(1)
 		}
 		agora := p.Now()
 		return p.Queue.Fail(
@@ -198,7 +208,7 @@ func (p *Pool) relatar(ctx context.Context) error {
 				ctx,
 				"progresso",
 				slog.String("fila", p.QueueName),
-				slog.Int64("executados", p.stats.Executed),
+				slog.Int64("executados", p.executados.Load()),
 			)
 		case <-ctx.Done():
 			return ctx.Err()

@@ -14,14 +14,14 @@ func TestRegistryRecarregaEnquantoLeem(t *testing.T) {
 	r := queue.NewRegistry()
 	r.Set(
 		"pagamentos",
-		queue.QueueConfig{Concurrency: 10, PollTimeout: time.Second},
+		queue.Config{Concurrency: 10, PollTimeout: time.Second},
 	)
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		for i := range 100 {
 			r.Set(
 				"pagamentos",
-				queue.QueueConfig{
+				queue.Config{
 					Concurrency: 10 + i,
 					PollTimeout: time.Second,
 				},
