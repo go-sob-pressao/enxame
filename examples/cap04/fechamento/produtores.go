@@ -3,6 +3,7 @@
 package fechamento
 
 // livro:inicio produtores
+
 // Produzir inicia um produtor por fonte e devolve um único canal com
 // tudo.
 func Produzir(fontes [][]int) <-chan int {
