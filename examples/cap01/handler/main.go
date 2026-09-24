@@ -23,10 +23,7 @@ func consultarFrete(ctx context.Context, cep string) (int, error) {
 
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	http.Handle(
-		"GET /frete/{cep}",
-		handlerFrete(consultarFreteSemContexto),
-	)
+	http.Handle("GET /frete/{cep}", handlerFrete(consultarFrete))
 	srv := &http.Server{
 		Addr:              ":8080",
 		ReadHeaderTimeout: 5 * time.Second,
@@ -35,9 +32,4 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil {
 		log.Error("servidor", slog.Any("erro", err))
 	}
-}
-
-// consultarFreteSemContexto é a chamada legada que não aceita context.
-func consultarFreteSemContexto(cep string) (int, error) {
-	return consultarFrete(context.Background(), cep)
 }

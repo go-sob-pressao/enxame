@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -15,7 +16,7 @@ import (
 // correm em paralelo, então o teste espera os 500 ms uma vez só.
 func TestCadaTimeoutDeixaUmaGoroutine(t *testing.T) {
 	lento := make(chan struct{})
-	consultar := func(string) (int, error) { <-lento; return 1, nil }
+	consultar := func(context.Context, string) (int, error) { <-lento; return 1, nil }
 	h := handlerFrete(consultar)
 
 	antes := runtime.NumGoroutine()
@@ -24,7 +25,8 @@ func TestCadaTimeoutDeixaUmaGoroutine(t *testing.T) {
 	for range n {
 		wg.Go(func() {
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(
+			req := httptest.NewRequestWithContext(
+				t.Context(),
 				http.MethodGet,
 				"/frete/01001000",
 				nil,

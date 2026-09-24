@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,12 +13,17 @@ import (
 
 // handlerFrete responde em até 500 ms: se o frete não chegar a tempo,
 // devolve 504 e segue a vida. O código passou em três revisões.
-func handlerFrete(consultar func(string) (int, error)) http.Handler {
+func handlerFrete(
+	consultar func(context.Context, string) (int, error),
+) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			resultado := make(chan int)
 			go func() {
-				valor, _ := consultar(r.PathValue("cep"))
+				valor, _ := consultar(
+					context.Background(),
+					r.PathValue("cep"),
+				)
 				resultado <- valor
 			}()
 

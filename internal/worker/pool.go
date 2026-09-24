@@ -51,7 +51,7 @@ type Pool struct {
 // prazo.
 var ErrAttemptTimeout = errors.New("tentativa excedeu o prazo")
 
-// livro:inicio pool-m1
+// livro:inicio pool-m1-corrigido
 
 // Run executa até o contexto ser cancelado ou a fila falhar. Um poller
 // busca; Concurrency workers executam; o errgroup propaga o primeiro
@@ -64,7 +64,7 @@ func (p *Pool) Run(ctx context.Context) error {
 	for range p.Concurrency {
 		g.Go(func() error { return p.trabalhar(ctx, jobs) })
 	}
-	go p.relatar()
+	g.Go(func() error { return p.relatar(ctx) })
 
 	if err := g.Wait(); !errors.Is(err, context.Canceled) {
 		return err
@@ -116,6 +116,12 @@ func (p *Pool) trabalhar(
 
 // executar roda uma tentativa com prazo. Se o handler não terminar a
 // tempo, a tentativa é registrada como falha e o worker segue adiante.
+//
+// Dono e término da goroutine do handler: o canal tem buffer de 1,
+// então o envio nunca bloqueia; e o contexto da tentativa é cancelado
+// no prazo, então o handler que respeita contexto termina logo depois.
+// O handler que ignora o contexto continua vivo até terminar — e
+// aparece no perfil goroutineleak.
 func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	h, ok := p.Handlers[j.Kind]
 	if !ok {
@@ -127,16 +133,22 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 			time.Time{},
 		)
 	}
-	resultado := make(chan error)
+	tentativa, cancelar := context.WithTimeoutCause(
+		ctx,
+		p.AttemptTimeout,
+		ErrAttemptTimeout,
+	)
+	defer cancelar()
+	resultado := make(chan error, 1)
 	go func() {
-		resultado <- runner.Call(ctx, h, j)
+		resultado <- runner.Call(tentativa, h, j)
 	}()
 
 	var err error
 	select {
 	case err = <-resultado:
-	case <-time.After(p.AttemptTimeout):
-		err = ErrAttemptTimeout
+	case <-tentativa.Done():
+		err = context.Cause(tentativa)
 	}
 	p.executados.Add(1)
 	if err != nil {
@@ -152,15 +164,23 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	return p.Queue.Complete(j.ID, p.Now())
 }
 
-// relatar registra o progresso periodicamente.
-func (p *Pool) relatar() {
-	for range time.NewTicker(p.ReportEvery).C {
-		p.Log.Info(
-			"progresso",
-			slog.String("fila", p.QueueName),
-			slog.Int64("executados", p.executados.Load()),
-		)
+// relatar registra o progresso periodicamente, até o contexto terminar.
+func (p *Pool) relatar(ctx context.Context) error {
+	t := time.NewTicker(p.ReportEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			p.Log.InfoContext(
+				ctx,
+				"progresso",
+				slog.String("fila", p.QueueName),
+				slog.Int64("executados", p.executados.Load()),
+			)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
-// livro:fim pool-m1
+// livro:fim pool-m1-corrigido
