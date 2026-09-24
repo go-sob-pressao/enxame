@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -44,8 +43,26 @@ type Pool struct {
 	Now            func() time.Time
 	Log            *slog.Logger
 
-	executados atomic.Int64
+	stats   Stats
+	rodando bool
 }
+
+// livro:inicio stats-corrida
+
+// Stats são os contadores do pool, para métricas e para o painel.
+type Stats struct {
+	Executed int64 // tentativas concluídas, com sucesso ou não
+	Failed   int64 // tentativas que falharam
+	Panics   int64 // tentativas que entraram em pânico
+}
+
+// Stats devolve uma cópia dos contadores.
+func (p *Pool) Stats() Stats { return p.stats }
+
+// Running informa se o pool está executando — a probe de saúde usa.
+func (p *Pool) Running() bool { return p.rodando }
+
+// livro:fim stats-corrida
 
 // ErrAttemptTimeout é a causa registrada quando a tentativa estoura o
 // prazo.
@@ -57,6 +74,8 @@ var ErrAttemptTimeout = errors.New("tentativa excedeu o prazo")
 // busca; Concurrency workers executam; o errgroup propaga o primeiro
 // erro e cancela os demais.
 func (p *Pool) Run(ctx context.Context) error {
+	p.rodando = true
+	defer func() { p.rodando = false }()
 	jobs := make(chan job.Job)
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -150,8 +169,12 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	case <-tentativa.Done():
 		err = context.Cause(tentativa)
 	}
-	p.executados.Add(1)
+	p.stats.Executed++
 	if err != nil {
+		p.stats.Failed++
+		if _, ok := errors.AsType[*runner.PanicError](err); ok {
+			p.stats.Panics++
+		}
 		agora := p.Now()
 		return p.Queue.Fail(
 			j.ID,
@@ -175,7 +198,7 @@ func (p *Pool) relatar(ctx context.Context) error {
 				ctx,
 				"progresso",
 				slog.String("fila", p.QueueName),
-				slog.Int64("executados", p.executados.Load()),
+				slog.Int64("executados", p.stats.Executed),
 			)
 		case <-ctx.Done():
 			return ctx.Err()
