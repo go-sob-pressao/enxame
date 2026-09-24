@@ -17,6 +17,7 @@ import (
 // versao é preenchida no build: -ldflags "-X main.versao=v1.2.3".
 var versao = "dev"
 
+// livro:inicio main-testavel
 func main() {
 	os.Exit(executar(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -35,6 +36,7 @@ func executar(args []string, saida, erros io.Writer) int {
 		fmt.Fprintln(saida, "enxamed", versao)
 		return 0
 	}
+	// livro:fim main-testavel
 
 	// Cap. 2: carregamento da configuração e wiring dos papéis.
 	// Cap. 19: encerramento gracioso no SIGTERM.
