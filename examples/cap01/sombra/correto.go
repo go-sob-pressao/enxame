@@ -3,6 +3,7 @@
 package main
 
 // livro:inicio sombra-correto
+
 func somarEstoque(ids []int) (int, error) {
 	total := 0
 	for _, id := range ids {

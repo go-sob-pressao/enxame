@@ -3,7 +3,7 @@
 // Um único binário hospeda os papéis — api, worker, scheduler, delivery
 // e cluster. Quais ficam ativos é decidido pela configuração (ADR-008).
 //
-//	enxamed -config deploy/docker/enxamed.dev.yaml
+//	enxamed -demo 5     executa o M0: cinco jobs, um processo, um por vez
 //	enxamed -version
 package main
 
@@ -18,6 +18,7 @@ import (
 var versao = "dev"
 
 // livro:inicio main-testavel
+
 func main() {
 	os.Exit(executar(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -28,6 +29,7 @@ func executar(args []string, saida, erros io.Writer) int {
 	fs := flag.NewFlagSet("enxamed", flag.ContinueOnError)
 	fs.SetOutput(erros)
 	config := fs.String("config", "", "arquivo de configuração do nó")
+	demo := fs.Int("demo", 0, "executa N jobs de exemplo no M0 e sai")
 	mostrarVersao := fs.Bool("version", false, "imprime a versão e sai")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -36,14 +38,19 @@ func executar(args []string, saida, erros io.Writer) int {
 		fmt.Fprintln(saida, "enxamed", versao)
 		return 0
 	}
-	// livro:fim main-testavel
 
-	// Cap. 2: carregamento da configuração e wiring dos papéis.
+	// livro:fim main-testavel
+	if *demo > 0 {
+		return demonstrar(*demo, saida, erros)
+	}
+
+	// Cap. 18: modo servidor, com workers remotos.
 	// Cap. 19: encerramento gracioso no SIGTERM.
 	// Cap. 32: drenagem de partições no preStop.
 	fmt.Fprintf(
 		erros,
-		"enxamed %s: esqueleto do cap-00 — os papéis entram a partir do Capítulo 2 (config: %q)\n",
+		"enxamed %s: o modo servidor entra no Capítulo 18; "+
+			"até lá, use -demo N (config: %q)\n",
 		versao,
 		*config,
 	)

@@ -3,6 +3,7 @@
 package main
 
 // livro:inicio defer-laco-correto
+
 // Cada iteração vira uma função: o defer fecha ao fim de cada uma.
 func processarTodos(p *Pool, n int) {
 	for range n {

@@ -3,6 +3,7 @@
 package main
 
 // livro:inicio nil-interface-correto
+
 func validar(nome string) error {
 	if nome == "" {
 		return &ErroValidacao{Campo: "nome"}

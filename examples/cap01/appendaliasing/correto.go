@@ -5,6 +5,7 @@ package main
 import "slices"
 
 // livro:inicio append-correto
+
 // slices.Clip corta a capacidade ao tamanho: o append seguinte é
 // obrigado a alocar um array novo para cada variação.
 func derivar(itens []int) (a, b []int) {

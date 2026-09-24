@@ -3,6 +3,7 @@
 package main
 
 // livro:inicio nil-interface-defeito
+
 // validar devolve um ponteiro nil dentro de uma interface. A interface
 // guarda o par (tipo, valor) = (*ErroValidacao, nil), e interface com
 // tipo não é nil.

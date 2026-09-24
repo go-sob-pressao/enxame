@@ -5,6 +5,7 @@ package main
 import "sync"
 
 // livro:inicio mutex-copia-defeito
+
 // Contador parece protegido: tem um Mutex e trava antes de escrever.
 type Contador struct {
 	mu     sync.Mutex

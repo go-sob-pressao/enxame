@@ -6,6 +6,7 @@ package main
 import "fmt"
 
 // livro:inicio escape
+
 // Ponto é pequeno e sem ponteiros.
 type Ponto struct{ X, Y int }
 

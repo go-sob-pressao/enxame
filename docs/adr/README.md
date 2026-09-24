@@ -13,6 +13,6 @@ redigidas; as demais são registradas quando o capítulo correspondente é escri
 | [005](0005-fencing-token-no-banco.md) | Fencing token no banco, verificado com `FOR SHARE` | Lease apenas por timeout | 24 | aceita |
 | 006 | Lock striped por chave (`job_id`, `ordering_key`) | Mutex por partição | 8 | proposta |
 | 007 | Enfileiramento transacional (`InsertTx`, `PublishTx`) | Publicação direta em broker | 15 | proposta |
-| 008 | Binário único, papéis modulares; também embutível como biblioteca | Microsserviços desde o início | 2 | proposta |
+| [008](0008-binario-unico-papeis-modulares.md) | Binário único, papéis modulares; também embutível como biblioteca | Microsserviços desde o início | 2 | aceita |
 | 009 | Simulação determinística | Apenas testes de integração | 27 | proposta |
 | 010 | Número de partições fixo (512) | Reparticionamento dinâmico | 26 | proposta |

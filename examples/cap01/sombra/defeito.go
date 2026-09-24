@@ -3,6 +3,7 @@
 package main
 
 // livro:inicio sombra-defeito
+
 func somarEstoque(ids []int) (total int, err error) {
 	for _, id := range ids {
 		qtd, err := consultar(id) // := cria um NOVO err, só deste bloco

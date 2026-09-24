@@ -5,6 +5,7 @@ package main
 import "sync"
 
 // livro:inicio mutex-copia-correto
+
 // Contador é usado sempre por ponteiro: existe um único Mutex.
 type Contador struct {
 	mu     sync.Mutex

@@ -9,6 +9,7 @@ import (
 )
 
 // livro:inicio handler-defeito
+
 // handlerFrete responde em até 500 ms: se o frete não chegar a tempo,
 // devolve 504 e segue a vida. O código passou em três revisões.
 func handlerFrete(consultar func(string) (int, error)) http.Handler {
