@@ -1,0 +1,53 @@
+# golangci-lint v2. Versão fixada em .github/workflows/ci.yaml.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard            # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - contextcheck
+    - errorlint
+    - fatcontext
+    - forbidigo
+    - intrange
+    - modernize
+    - nilerr
+    - noctx
+    - revive
+    - sloglint
+    - spancheck
+    - unconvert
+    - usestdlibvars
+    - wastedassign
+  settings:
+    forbidigo:
+      forbid:
+        # Anti-Pattern #4 — o livro o transforma em regra executável.
+        - pattern: ^time\.Sleep$
+          msg: "time.Sleep em teste é uma aposta (Regra 11). Use synctest, um Clock injetável ou sincronização explícita."
+    sloglint:
+      kv-only: false
+      attr-only: true          # slog.String(...), nunca pares soltos chave/valor
+      no-global: all           # logger injetado, nunca slog.Info global
+      context: scope
+  exclusions:
+    presets: [std-error-handling]
+    paths:
+      - tools/archcheck/testdata   # módulos com violações plantadas de propósito
+    rules:
+      - path: _test\.go
+        linters: [errcheck]
+      # A proibição de time.Sleep vale só para teste.
+      - path-except: _test\.go
+        linters: [forbidigo]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [github.com/go-sob-pressao/enxame]

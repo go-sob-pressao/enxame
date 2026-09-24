@@ -1,0 +1,27 @@
+# Configuração de desenvolvimento de um nó do Enxame.
+# O carregamento entra no Capítulo 2 (internal/config); os campos são
+# ativados à medida que os capítulos constroem cada papel.
+
+node:
+  id: dev-1
+  roles: [api, worker, scheduler, delivery]   # binário único, papéis modulares (ADR-008)
+
+store:
+  driver: postgres                             # postgres | sqlite | memory
+  dsn: postgres://postgres:enxame@localhost:5432/enxame?sslmode=disable
+
+listen:
+  http: ":8080"          # API pública (Cap. 19)
+  grpc: ":7233"          # workers remotos e nós (Cap. 18)
+  ops: ":9090"           # /metrics, /debug/pprof, probes (Caps. 29 a 32)
+
+queues:
+  default:
+    max_workers: 50
+
+cluster:
+  coordinator: single    # single | pg | raft (ADR-003)
+  partitions: 512        # fixo na criação do cluster (ADR-010)
+
+telemetry:
+  otlp_endpoint: localhost:4317

@@ -1,0 +1,9 @@
+internal/cluster/coordinator: importa internal/cluster/pgcoord (camada "internal/cluster/coordinator" não pode importar "internal/cluster/pgcoord")
+internal/core/pedido: importa a biblioteca de terceiros exemplo.com/externa (internal/core é domínio puro)
+internal/core/pedido: importa internal/store (camada "internal/core" não pode importar "internal")
+internal/core/pedido: importa os, que faz I/O ou introduz não determinismo (internal/core é domínio puro)
+internal/core/pedido/pedido.go:20: usa time.Now — receba o instante ou um Clock como parâmetro
+internal/core/pedido/pedido.go:21: usa uuid.NewV7 — receba o identificador pronto da borda
+internal/core/pedido/pedido.go:25: usa time.Now — receba o instante ou um Clock como parâmetro
+internal/core/pedido/prazo.go:11: usa context.WithTimeout — o prazo é assunto da borda; receba o instante
+pkg/cliente: importa internal/engine (camada "pkg" não pode importar "internal/engine")

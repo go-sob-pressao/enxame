@@ -1,0 +1,33 @@
+name: Simulação noturna
+
+# Varre seeds aleatórias em busca de violações de invariante (Cap. 27).
+# Qualquer falha é reproduzível: a seed é publicada no artefato.
+on:
+  schedule: [{ cron: '0 4 * * *' }]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  varredura:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: { lote: [1, 2, 3, 4] }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version-file: go.mod, cache: true }
+      - name: Varredura de 2.000 seeds
+        run: |
+          if ! ls test/simulation/*_test.go >/dev/null 2>&1; then
+            echo "SKIP — nenhum cenário ainda; entram no Capítulo 27"; exit 0
+          fi
+          go test -tags=simulation -timeout=120m ./test/simulation/... \
+            -args -random-seeds=2000 -lote=${{ matrix.lote }}
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: seeds-falhas-${{ matrix.lote }}
+          path: test/simulation/failures/

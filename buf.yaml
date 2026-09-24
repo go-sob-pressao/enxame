@@ -1,0 +1,7 @@
+version: v2
+modules:
+  - path: internal/transport/grpc/proto
+lint:
+  use: [STANDARD]
+breaking:
+  use: [FILE]

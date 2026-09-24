@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # enxamed rodando no host (make build && ./bin/enxamed ...)
+  - job_name: enxamed
+    static_configs:
+      - targets: ["host.docker.internal:9090"]

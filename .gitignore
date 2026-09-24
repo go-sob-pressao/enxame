@@ -1,0 +1,9 @@
+/bin/
+/dist/
+*.out
+*.test
+coverage.*
+.env
+.idea/
+.vscode/
+__debug_bin*
