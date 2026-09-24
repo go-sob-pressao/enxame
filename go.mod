@@ -3,6 +3,7 @@ module github.com/go-sob-pressao/enxame
 go 1.27.0
 
 require (
+	go.uber.org/goleak v1.3.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/tools v0.50.0
 )
