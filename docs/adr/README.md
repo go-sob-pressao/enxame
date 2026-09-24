@@ -11,7 +11,7 @@ redigidas; as demais são registradas quando o capítulo correspondente é escri
 | [003](0003-coordinator-com-duas-implementacoes.md) | Coordenação atrás de um contrato, com duas implementações (Postgres e Raft) | Raft como única coordenação | 25 | aceita |
 | 004 | PostgreSQL como storage de produção | Storage engine próprio | 14 | proposta |
 | [005](0005-fencing-token-no-banco.md) | Fencing token no banco, verificado com `FOR SHARE` | Lease apenas por timeout | 24 | aceita |
-| 006 | Lock striped por chave (`job_id`, `ordering_key`) | Mutex por partição | 8 | proposta |
+| [006](0006-lock-striped-por-chave.md) | Lock striped por chave (`job_id`, `ordering_key`) | Mutex por partição | 8 | aceita |
 | 007 | Enfileiramento transacional (`InsertTx`, `PublishTx`) | Publicação direta em broker | 15 | proposta |
 | [008](0008-binario-unico-papeis-modulares.md) | Binário único, papéis modulares; também embutível como biblioteca | Microsserviços desde o início | 2 | aceita |
 | 009 | Simulação determinística | Apenas testes de integração | 27 | proposta |
