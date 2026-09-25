@@ -5,7 +5,6 @@ package storetest
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/store"
+	"github.com/go-sob-pressao/enxame/internal/store/serde"
 )
 
 // Store é o contrato que a suíte verifica. É o mesmo método a método
@@ -128,7 +128,9 @@ func idDe(n int) id.JobID {
 
 func gravaELe(t *testing.T, s Store) {
 	j := novo(t, s, 1, job.Spec{
-		Args:      []byte(`{"pedido": 42, "itens": ["a", "b"]}`),
+		Args: []byte(
+			`{"pedido": 9007199254740993, "itens": ["a", "b"]}`,
+		),
 		UniqueKey: "pedido-42",
 		Priority:  1,
 	})
@@ -286,21 +288,14 @@ func mesmoJob(t *testing.T, got, want job.Job) {
 	}
 }
 
-// jsonIgual trata Args ausente como {}, o padrão da coluna no Postgres.
+// jsonIgual compara número a número, pela forma canônica do serde.
+// (Até o Capítulo 13, esta função decodificava para any e comparava os
+// float64: dois ids de 19 dígitos diferentes passavam por iguais.)
 func jsonIgual(t *testing.T, a, b []byte) bool {
 	t.Helper()
-	if len(a) == 0 {
-		a = []byte("{}")
+	igual, err := serde.Equal(a, b)
+	if err != nil {
+		t.Fatalf("Args inválido: %v", err)
 	}
-	if len(b) == 0 {
-		b = []byte("{}")
-	}
-	var x, y any
-	if err := json.Unmarshal(a, &x); err != nil {
-		t.Fatalf("Args inválido: %s", a)
-	}
-	if err := json.Unmarshal(b, &y); err != nil {
-		t.Fatalf("Args inválido: %s", b)
-	}
-	return fmt.Sprint(x) == fmt.Sprint(y)
+	return igual
 }

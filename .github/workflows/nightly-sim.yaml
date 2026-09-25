@@ -31,3 +31,17 @@ jobs:
         with:
           name: seeds-falhas-${{ matrix.lote }}
           path: test/simulation/failures/
+
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with: { go-version-file: go.mod, cache: true }
+      - name: Fuzzing de 10 minutos por alvo (Cap. 13)
+        run: FUZZTIME=10m make fuzz
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: fuzz-corpus
+          path: '**/testdata/fuzz/**'

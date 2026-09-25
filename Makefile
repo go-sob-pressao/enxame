@@ -53,8 +53,14 @@ integration:     ## integração contra Postgres real (make up; ENXAME_DB_DSN)
 		$(GO) test -tags=integration -count=1 ./test/integration/...; \
 	else echo "integration: SKIP — nenhum teste ainda; entram no Capítulo 12"; fi
 
-fuzz:            ## fuzzing de 30s por alvo (Cap. 13)
-	@$(GO) test -list '^Fuzz' $(PKGS) | grep -E '^Fuzz' || echo "fuzz: SKIP — nenhum alvo ainda; entram no Capítulo 13"
+FUZZTIME ?= 30s
+fuzz:            ## fuzzing de 30s por alvo (Cap. 13); FUZZTIME=2m make fuzz
+	@for pkg in $$($(GO) list ./internal/...); do \
+	  for alvo in $$($(GO) test -list '^Fuzz' $$pkg | grep -E '^Fuzz'); do \
+	    echo "== $$pkg $$alvo"; \
+	    $(GO) test -run '^$$' -fuzz "^$$alvo\$$" -fuzztime $(FUZZTIME) $$pkg || exit 1; \
+	  done; \
+	done
 
 defeitos:        ## reproduz os defeitos dos exemplos (build tag defeito; fora da CI)
 	$(GO) test -count=1 -short -tags defeito ./examples/...
