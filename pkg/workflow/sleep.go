@@ -28,7 +28,11 @@ func Sleep(c *Context, name string, d time.Duration) error {
 // SideEffect grava o valor que fn devolve na primeira execução, e o
 // devolve em cada replay. É para o que muda a cada chamada — um número
 // aleatório, um UUID — e não tem efeito fora do processo.
-func SideEffect[T any](c *Context, name string, fn func() T) (T, error) {
+func SideEffect[T any](
+	c *Context,
+	name string,
+	fn func() T,
+) (T, error) {
 	var zero T
 	r, gravado, err := c.proximo(name, KindSideEffect)
 	if err != nil {

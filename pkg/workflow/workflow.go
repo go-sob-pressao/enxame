@@ -29,7 +29,8 @@ type Record struct {
 }
 
 // History é o histórico de passos de um run, visto pelo workflow.
-// Lookup devolve o passo seq, se já foi gravado; Append grava o próximo.
+// Lookup devolve o passo seq, se já foi gravado; Append grava o
+// próximo.
 type History interface {
 	Lookup(seq int) (Record, bool)
 	Append(ctx context.Context, r Record) error
@@ -86,7 +87,9 @@ func (e *SuspendedError) Error() string {
 }
 
 // Is faz errors.Is(err, ErrSuspended) valer para SuspendedError.
-func (e *SuspendedError) Is(alvo error) bool { return alvo == ErrSuspended }
+func (e *SuspendedError) Is(alvo error) bool {
+	return alvo == ErrSuspended
+}
 
 // NonDeterministicError indica que o código do workflow, reexecutado,
 // pediu na posição Seq um passo diferente do que está gravado. O run

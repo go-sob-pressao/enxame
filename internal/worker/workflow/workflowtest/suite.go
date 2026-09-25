@@ -14,7 +14,8 @@ import (
 	"github.com/go-sob-pressao/enxame/pkg/workflow"
 )
 
-// Store é o armazenamento sob teste: o do replay mais a criação de runs.
+// Store é o armazenamento sob teste: o do replay mais a criação de
+// runs.
 type Store interface {
 	wf.Store
 	StartRun(ctx context.Context, run workflow.Run) (string, error)
@@ -85,7 +86,10 @@ func passoConcluido(t *testing.T, s Store) {
 	r := &wf.Replayer{Store: s, Funcs: map[string]wf.Func{"f": fn},
 		Now: (&relogio{t0}).agora}
 	id := iniciar(t, s, "f")
-	if _, err := r.Advance(t.Context(), id); !errors.Is(err, falhaEmail) {
+	if _, err := r.Advance(t.Context(), id); !errors.Is(
+		err,
+		falhaEmail,
+	) {
 		t.Fatalf("primeira execução: %v", err)
 	}
 	o, err := r.Advance(t.Context(), id)
@@ -191,7 +195,9 @@ func permanente(t *testing.T, s Store) {
 		return workflow.Step(c, "cobrar",
 			func(context.Context) (int, error) {
 				chamadas++
-				return 0, workflow.Permanent(errors.New("cartão recusado"))
+				return 0, workflow.Permanent(
+					errors.New("cartão recusado"),
+				)
 			})
 	}
 	r := &wf.Replayer{Store: s, Funcs: map[string]wf.Func{"f": fn},

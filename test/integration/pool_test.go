@@ -62,7 +62,11 @@ func pool(
 }
 
 // esperarConcluidos espera todos os jobs chegarem a completed.
-func esperarConcluidos(t *testing.T, s *postgres.Store, ids []id.JobID) {
+func esperarConcluidos(
+	t *testing.T,
+	s *postgres.Store,
+	ids []id.JobID,
+) {
 	t.Helper()
 	limite := time.Now().Add(30 * time.Second)
 	for time.Now().Before(limite) {
@@ -157,10 +161,10 @@ func TestTrabalhoSobreviveAoProcesso(t *testing.T) {
 		t.Logf("primeiro pool terminou com %v", err)
 	}
 	// As tentativas em curso no cancelamento não conseguiram registrar
-	// o fim: a Fila guarda o contexto do pool, que já acabou. Ficaram em
-	// running, como ficariam depois de um kill -9. O novo processo roda
-	// um resgatador com prazo fixo de um segundo, bem acima dos 20 ms de
-	// cada tentativa.
+	// o fim: a Fila guarda o contexto do pool, que já acabou. Ficaram
+	// em running, como ficariam depois de um kill -9. O novo processo
+	// roda um resgatador com prazo fixo de um segundo, bem acima dos 20
+	// ms de cada tentativa.
 	ctx2, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	go func() { _ = pool(postgres.NewFila(ctx2, s), "w2", lento).Run(ctx2) }()

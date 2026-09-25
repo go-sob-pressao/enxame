@@ -13,7 +13,8 @@ import (
 )
 
 // StartRun cria o run; o banco gera o id (uuidv7). O índice parcial
-// workflow_run_aberto recusa um segundo run aberto do mesmo workflow_id.
+// workflow_run_aberto recusa um segundo run aberto do mesmo
+// workflow_id.
 func (s *Store) StartRun(
 	ctx context.Context,
 	run workflow.Run,
@@ -93,13 +94,22 @@ func (s *Store) AppendStep(
 	if r.Err != "" {
 		estado, falha = "failed", r.Err
 	}
-	tag, err := s.pool.Exec(ctx, `INSERT INTO workflow_step
+	tag, err := s.pool.Exec(
+		ctx,
+		`INSERT INTO workflow_step
 		(run_id, step_seq, step_name, step_kind, state, output, error,
 		 wake_at, completed_at)
 		SELECT run_id, $2, $3, $4, $5, $6, to_jsonb($7::text), $8, now()
 		FROM workflow_run WHERE run_id = $1 AND state = 'running'`,
-		runID, r.Seq, r.Name, string(r.Kind), estado, jsonNulo(r.Output),
-		falha, instanteNulo(r.WakeAt))
+		runID,
+		r.Seq,
+		r.Name,
+		string(r.Kind),
+		estado,
+		jsonNulo(r.Output),
+		falha,
+		instanteNulo(r.WakeAt),
+	)
 	if err != nil {
 		if errors.Is(traduzir(err), store.ErrDuplicate) {
 			return store.ErrConflict

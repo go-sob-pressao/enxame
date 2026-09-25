@@ -17,7 +17,11 @@ type Store interface {
 		workflow.Run, []workflow.Record, error)
 	// AppendStep grava o próximo passo; store.ErrConflict se a posição
 	// já foi gravada por outra execução, ou se o run já foi encerrado.
-	AppendStep(ctx context.Context, runID string, r workflow.Record) error
+	AppendStep(
+		ctx context.Context,
+		runID string,
+		r workflow.Record,
+	) error
 	// CloseRun encerra o run com a saída ou o erro.
 	CloseRun(ctx context.Context, run workflow.Run) error
 }
@@ -101,7 +105,10 @@ func (h *historico) Lookup(seq int) (workflow.Record, bool) {
 	return h.passos[seq-1], true
 }
 
-func (h *historico) Append(ctx context.Context, r workflow.Record) error {
+func (h *historico) Append(
+	ctx context.Context,
+	r workflow.Record,
+) error {
 	if err := h.store.AppendStep(ctx, h.runID, r); err != nil {
 		return err
 	}

@@ -80,7 +80,10 @@ func (w *Workflows) AppendStep(
 }
 
 // CloseRun encerra o run, se ainda estiver aberto.
-func (w *Workflows) CloseRun(_ context.Context, run workflow.Run) error {
+func (w *Workflows) CloseRun(
+	_ context.Context,
+	run workflow.Run,
+) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	atual, ok := w.runs[run.ID]
