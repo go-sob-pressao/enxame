@@ -47,6 +47,12 @@ func Insert(s Spec, at time.Time) ([]Event, Job, error) {
 			j.Priority,
 		)
 	}
+	if j.MaxAttempts < 0 {
+		return nil, Job{}, fmt.Errorf(
+			"máximo de tentativas negativo: %d",
+			j.MaxAttempts,
+		)
+	}
 	if j.MaxAttempts == 0 {
 		j.MaxAttempts = tentativasPadrao
 	}
