@@ -68,8 +68,8 @@ func Insert(s Spec, at time.Time) ([]Event, Job, error) {
 
 // Start registra que um worker pegou o job disponível.
 func Start(j Job, at time.Time, worker string) ([]Event, error) {
-	if j.State != StateAvailable {
-		return nil, invalida(j, "iniciar")
+	if err := exigir(j, "iniciar"); err != nil {
+		return nil, err
 	}
 	return []Event{
 		{
@@ -83,8 +83,8 @@ func Start(j Job, at time.Time, worker string) ([]Event, error) {
 
 // Complete registra que o handler devolveu nil.
 func Complete(j Job, at time.Time) ([]Event, error) {
-	if j.State != StateRunning {
-		return nil, invalida(j, "concluir")
+	if err := exigir(j, "concluir"); err != nil {
+		return nil, err
 	}
 	return []Event{{Type: EventCompleted, At: at}}, nil
 }
@@ -98,8 +98,8 @@ func Fail(
 	permanent bool,
 	retryAt time.Time,
 ) ([]Event, error) {
-	if j.State != StateRunning {
-		return nil, invalida(j, "registrar falha")
+	if err := exigir(j, "registrar falha"); err != nil {
+		return nil, err
 	}
 	evs := []Event{
 		{
@@ -124,8 +124,8 @@ func Fail(
 // MakeAvailable torna elegível um job agendado ou em espera de retry
 // cuja hora chegou.
 func MakeAvailable(j Job, at time.Time) ([]Event, error) {
-	if j.State != StateScheduled && j.State != StateRetryable {
-		return nil, invalida(j, "tornar disponível")
+	if err := exigir(j, "tornar disponível"); err != nil {
+		return nil, err
 	}
 	if at.Before(j.ScheduledAt) {
 		return nil, fmt.Errorf(
@@ -140,18 +140,16 @@ func MakeAvailable(j Job, at time.Time) ([]Event, error) {
 
 // Cancel cancela o job — só antes de uma tentativa começar.
 func Cancel(j Job, at time.Time) ([]Event, error) {
-	switch j.State {
-	case StateScheduled, StateAvailable, StateRetryable:
-		return []Event{{Type: EventCancelled, At: at}}, nil
-	default:
-		return nil, invalida(j, "cancelar")
+	if err := exigir(j, "cancelar"); err != nil {
+		return nil, err
 	}
+	return []Event{{Type: EventCancelled, At: at}}, nil
 }
 
 // Rescue devolve à fila o job cujo worker morreu no meio da tentativa.
 func Rescue(j Job, at time.Time) ([]Event, error) {
-	if j.State != StateRunning {
-		return nil, invalida(j, "resgatar")
+	if err := exigir(j, "resgatar"); err != nil {
+		return nil, err
 	}
 	return []Event{{Type: EventRescued, At: at}}, nil
 }
