@@ -1,12 +1,13 @@
 // Command sobrevive: o Experimento 14.1 — kill -9 no meio do trabalho
 // e conferência do histórico.
 //
-//	export ENXAME_DB_DSN=postgres://postgres:enxame@localhost:5432/enxame?sslmode=disable
-//	go run ./examples/cap14/sobrevive enfileirar 2000
-//	go run ./examples/cap14/sobrevive trabalhar &   # e, dois segundos depois:
+//	export ENXAME_DB_DSN=postgres://…   # o de make up
+//	go build -o sobrevive ./examples/cap14/sobrevive
+//	./sobrevive enfileirar 5000
+//	./sobrevive trabalhar &   # e, dois segundos depois:
 //	kill -9 %1
-//	go run ./examples/cap14/sobrevive conferir
-//	go run ./examples/cap14/sobrevive trabalhar -resgatar
+//	./sobrevive conferir
+//	./sobrevive trabalhar -resgatar
 //
 // O kill -9 não dá ao processo chance de nada: nenhum defer, nenhum
 // cancelamento, nenhum log. O que sobrevive é o que o banco confirmou.
@@ -38,7 +39,8 @@ const namespace = "cap14-sobrevive"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr,
-			"uso: sobrevive enfileirar N | trabalhar [-resgatar] | conferir")
+			"uso: sobrevive enfileirar N | trabalhar [-resgatar]"+
+				" | conferir")
 		os.Exit(2)
 	}
 	ctx := context.Background()
@@ -94,7 +96,11 @@ func abrir(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return db, err
 }
 
-func enfileirar(ctx context.Context, db *pgxpool.Pool, args []string) error {
+func enfileirar(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	args []string,
+) error {
 	n, err := strconv.Atoi(args[0])
 	if err != nil {
 		return err
@@ -123,7 +129,11 @@ func enfileirar(ctx context.Context, db *pgxpool.Pool, args []string) error {
 	return nil
 }
 
-func trabalhar(ctx context.Context, db *pgxpool.Pool, args []string) error {
+func trabalhar(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	args []string,
+) error {
 	fs := flag.NewFlagSet("trabalhar", flag.ExitOnError)
 	resgatar := fs.Bool("resgatar", false,
 		"resgata antes os jobs em running de um processo morto")

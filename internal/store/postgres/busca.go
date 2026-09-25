@@ -28,7 +28,8 @@ func (s *Store) Claim(
 	achou := false
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		j, v, err := ler(tx.QueryRow(ctx, `SELECT `+colunas+` FROM job
-			WHERE queue = $1 AND state = 'available'
+			WHERE partition_id = 0 AND queue = $1
+			  AND state = 'available'
 			ORDER BY priority, scheduled_at, job_id
 			LIMIT 1 FOR UPDATE SKIP LOCKED`, queue))
 		if errors.Is(err, store.ErrNotFound) {
@@ -85,7 +86,8 @@ func (s *Store) Promote(
 	ctx context.Context,
 	at time.Time,
 ) (int, error) {
-	return s.emLote(ctx, `state IN ('scheduled', 'retryable')
+	return s.emLote(ctx, `partition_id = 0
+		AND state IN ('scheduled', 'retryable')
 		AND scheduled_at <= $1`, at,
 		func(j job.Job) ([]job.Event, error) {
 			return job.MakeAvailable(j, at)
@@ -103,7 +105,8 @@ func (s *Store) Rescue(
 	ctx context.Context,
 	at, desde time.Time,
 ) (int, error) {
-	return s.emLote(ctx, `state = 'running' AND attempted_at < $1`,
+	return s.emLote(ctx, `partition_id = 0
+		AND state = 'running' AND attempted_at < $1`,
 		desde, func(j job.Job) ([]job.Event, error) {
 			return job.Rescue(j, at)
 		})
