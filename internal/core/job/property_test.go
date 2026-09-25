@@ -95,7 +95,8 @@ func invariantes(
 	}
 	refeito, err := job.ApplyAll(base, historico)
 	if err != nil || refeito.State != j.State ||
-		refeito.Attempt != j.Attempt || refeito.LastError != j.LastError {
+		refeito.Attempt != j.Attempt ||
+		refeito.LastError != j.LastError {
 		t.Fatalf("%s: o histórico não reproduz a projeção", nome)
 	}
 }
