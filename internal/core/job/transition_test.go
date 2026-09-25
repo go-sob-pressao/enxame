@@ -124,3 +124,16 @@ func TestTransicoesInvalidas(t *testing.T) {
 		t.Errorf("cancelar em execução: %v", err)
 	}
 }
+
+// Achado pela propriedade do Capítulo 13: resgatar a última tentativa
+// devolvia o job à fila, e a tentativa seguinte passava do máximo.
+func TestResgateNaUltimaTentativaDescarta(t *testing.T) {
+	j := novo(t, job.Spec{MaxAttempts: 1})
+	evs, err := job.Start(j, t0, "w1")
+	j = aplicar(t, j, evs, err)
+	evs, err = job.Rescue(j, t0.Add(time.Minute))
+	j = aplicar(t, j, evs, err)
+	if j.State != job.StateDiscarded || j.Attempt != 1 {
+		t.Fatalf("depois do resgate da última tentativa: %+v", j)
+	}
+}

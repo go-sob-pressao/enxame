@@ -146,13 +146,27 @@ func Cancel(j Job, at time.Time) ([]Event, error) {
 	return []Event{{Type: EventCancelled, At: at}}, nil
 }
 
+// livro:inicio rescue
+
 // Rescue devolve à fila o job cujo worker morreu no meio da tentativa.
+// A tentativa órfã conta: se era a última, o job é descartado, e não
+// devolvido — senão a próxima tentativa passaria do máximo. (Defeito
+// presente desde o Capítulo 2; a propriedade do Capítulo 13 o achou.)
 func Rescue(j Job, at time.Time) ([]Event, error) {
 	if err := exigir(j, "resgatar"); err != nil {
 		return nil, err
 	}
+	if j.Attempt >= j.MaxAttempts {
+		return []Event{{
+			Type:  EventDiscarded,
+			At:    at,
+			Cause: "worker perdido na última tentativa",
+		}}, nil
+	}
 	return []Event{{Type: EventRescued, At: at}}, nil
 }
+
+// livro:fim rescue
 
 // livro:fim decidir
 
