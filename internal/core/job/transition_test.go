@@ -12,12 +12,14 @@ import (
 
 var t0 = time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 
+var idFixo = id.JobID(
+	uuid.MustParse("0192a3b4-0000-7000-8000-000000000001"),
+)
+
 func novo(t *testing.T, s job.Spec) job.Job {
 	t.Helper()
 	if s.ID.IsZero() {
-		s.ID = id.JobID(
-			uuid.MustParse("0192a3b4-0000-7000-8000-000000000001"),
-		)
+		s.ID = idFixo
 	}
 	if s.Queue == "" {
 		s.Queue = "padrao"
