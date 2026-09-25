@@ -73,15 +73,19 @@ var especificacao = []struct {
 }
 
 // TestMaquinaDeEstados percorre todos os pares (estado, ação): os da
-// especificação levam ao estado previsto; os outros são recusados.
+// especificação levam ao estado previsto; os outros são recusados. O
+// nome de cada subteste diz qual dos dois ele exige.
 func TestMaquinaDeEstados(t *testing.T) {
 	for _, de := range estados {
 		for _, a := range acoes {
-			nome := fmt.Sprintf("%s/%s", de, a.nome)
+			para, valida := destino(de, a)
+			nome := fmt.Sprintf("%s/%s é recusado", de, a.nome)
+			if valida {
+				nome = fmt.Sprintf("%s/%s leva a %s", de, a.nome, para)
+			}
 			t.Run(nome, func(t *testing.T) {
 				j := emEstado(t, de)
 				evs, err := a.decide(j)
-				para, valida := destino(de, a)
 				if !valida {
 					if !errors.Is(err, job.ErrInvalidTransition) {
 						t.Fatalf("deveria ser recusada; err=%v", err)
