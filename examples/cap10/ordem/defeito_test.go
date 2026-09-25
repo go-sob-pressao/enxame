@@ -14,7 +14,8 @@ import (
 var cadastro = &Cadastro{}
 
 func TestIncluirCliente(t *testing.T) {
-	if err := cadastro.Incluir(context.Background(), "ana"); err != nil {
+	ctx := context.Background()
+	if err := cadastro.Incluir(ctx, "ana"); err != nil {
 		t.Fatal(err)
 	}
 }
