@@ -161,7 +161,10 @@ func nowIgual(t *testing.T, s Store) {
 
 func diverge(t *testing.T, s Store) {
 	passo := func(nome string) wf.Func {
-		return func(c *workflow.Context, _ json.RawMessage) (any, error) {
+		return func(
+			c *workflow.Context,
+			_ json.RawMessage,
+		) (any, error) {
 			_, err := workflow.Step(c, nome,
 				func(context.Context) (int, error) { return 1, nil })
 			if err != nil {
