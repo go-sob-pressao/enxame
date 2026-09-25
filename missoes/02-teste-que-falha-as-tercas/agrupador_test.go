@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -55,25 +56,30 @@ func TestSaidaEntregaOQueSobrou(t *testing.T) {
 	}
 }
 
-// livro:inicio missao-02-teste
+// livro:inicio missao-02-gabarito
 
 // TestMissao: dez eventos seguidos, com lote de dez, formam UM lote.
-// Na CI, este teste falha às vezes — às terças, dizem.
+// Dentro da bolha, o relógio só anda quando todas as goroutines estão
+// bloqueadas de vez: enquanto os dez eventos passam de uma goroutine
+// para a outra, nenhum tempo passa, e o prazo do lote não pode vencer
+// no meio. synctest.Wait espera o agrupador terminar de trabalhar.
 func TestMissao(t *testing.T) {
-	var c coletor
-	a := Novo(10, intervalo, c.entregar)
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	go a.Rodar(ctx)
-	for i := range 10 {
-		if err := a.Adicionar(ctx, fmt.Sprint(i)); err != nil {
-			t.Fatal(err)
+	synctest.Test(t, func(t *testing.T) {
+		var c coletor
+		a := Novo(10, intervalo, c.entregar)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		go a.Rodar(ctx)
+		for i := range 10 {
+			if err := a.Adicionar(ctx, fmt.Sprint(i)); err != nil {
+				t.Fatal(err)
+			}
 		}
-	}
-	time.Sleep(20 * time.Millisecond) //nolint:forbidigo // o enigma
-	if got := c.tamanhos(); len(got) != 1 || got[0] != 10 {
-		t.Fatalf("lotes de tamanho %v, esperado [10]", got)
-	}
+		synctest.Wait()
+		if got := c.tamanhos(); len(got) != 1 || got[0] != 10 {
+			t.Fatalf("lotes de tamanho %v, esperado [10]", got)
+		}
+	})
 }
 
-// livro:fim missao-02-teste
+// livro:fim missao-02-gabarito
