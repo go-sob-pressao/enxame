@@ -68,20 +68,22 @@ func historicoLongo(b *testing.B, s *postgres.Store, n int) id.JobID {
 // livro:inicio custo-replay
 
 // BenchmarkReplay compara as duas formas de saber o estado de um job:
-// ler a projeção, que cada transição mantém em dia, ou reconstruí-la do
-// histórico. A projeção é o snapshot que o Enxame nunca deixa envelhecer.
+// ler a projeção, que cada transição mantém em dia, ou reconstruí-la
+// do histórico. A projeção é o snapshot que o Enxame nunca deixa
+// envelhecer.
 func BenchmarkReplay(b *testing.B) {
 	for _, n := range []int{10, 1_000, 100_000} {
 		s := postgres.New(testutil.Postgres(b))
 		jid := historicoLongo(b, s, n)
-		b.Run(fmt.Sprintf("eventos=%d/projecao", n), func(b *testing.B) {
+		nome := fmt.Sprintf("eventos=%d/", n)
+		b.Run(nome+"projecao", func(b *testing.B) {
 			for b.Loop() {
 				if _, _, err := s.Get(b.Context(), jid); err != nil {
 					b.Fatal(err)
 				}
 			}
 		})
-		b.Run(fmt.Sprintf("eventos=%d/replay", n), func(b *testing.B) {
+		b.Run(nome+"replay", func(b *testing.B) {
 			for b.Loop() {
 				evs, err := s.History(b.Context(), jid)
 				if err != nil {

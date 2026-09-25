@@ -152,7 +152,9 @@ func TestTrabalhoSobreviveAoProcesso(t *testing.T) {
 	}
 	ctx1, para := context.WithCancel(t.Context())
 	fim := make(chan error, 1)
-	go func() { fim <- pool(postgres.NewFila(ctx1, s), "w1", lento).Run(ctx1) }()
+	go func() {
+		fim <- pool(postgres.NewFila(ctx1, s), "w1", lento).Run(ctx1)
+	}()
 	for feitos.Load() < 10 {
 		<-time.After(5 * time.Millisecond)
 	}
@@ -167,7 +169,9 @@ func TestTrabalhoSobreviveAoProcesso(t *testing.T) {
 	// ms de cada tentativa.
 	ctx2, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	go func() { _ = pool(postgres.NewFila(ctx2, s), "w2", lento).Run(ctx2) }()
+	go func() {
+		_ = pool(postgres.NewFila(ctx2, s), "w2", lento).Run(ctx2)
+	}()
 	go func() {
 		for ctx2.Err() == nil {
 			agora := time.Now()
