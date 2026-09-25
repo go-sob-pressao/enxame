@@ -158,32 +158,6 @@ func (s *Store) Next(
 	return j, v, err == nil, err
 }
 
-// acrescentar grava cada evento com seq tirado de job.next_seq, na
-// mesma instrução que o incrementa.
-func acrescentar(
-	ctx context.Context,
-	tx pgx.Tx,
-	jid id.JobID,
-	evs []job.Event,
-) error {
-	for _, e := range evs {
-		p, err := json.Marshal(store.PayloadOf(e))
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `WITH s AS (
-				UPDATE job SET next_seq = next_seq + 1 WHERE job_id = $1
-				RETURNING next_seq - 1 AS seq)
-			INSERT INTO job_event (job_id, seq, event_type, occurred_at,
-				payload)
-			SELECT $1, seq, $2, $3, $4 FROM s`,
-			jid.String(), int16(e.Type), e.At, string(p)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func ler(r pgx.Row) (job.Job, int64, error) {
 	var (
 		j                      job.Job

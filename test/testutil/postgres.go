@@ -19,7 +19,7 @@ import (
 // teste, com as migrações aplicadas, e apagado quando o teste termina.
 // O servidor vem de ENXAME_DB_DSN (make up, ou o serviço da CI); sem a
 // variável, o teste é pulado, e não falha.
-func Postgres(t *testing.T) *pgxpool.Pool {
+func Postgres(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("ENXAME_DB_DSN")
 	if dsn == "" {
