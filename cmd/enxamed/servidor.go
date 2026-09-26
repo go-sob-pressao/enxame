@@ -31,7 +31,7 @@ type config struct {
 	aviso, prazo    time.Duration
 	resgate         time.Duration
 	taxa, rajada    float64
-	emCurso         int
+	emCurso, naFila int
 }
 
 // livro:inicio servir
@@ -59,6 +59,7 @@ func servir(
 
 	a := api.NovaAPI(db, c.tokens, log)
 	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
+	a.Fila = api.Fila{Max: c.naFila, Validade: time.Second}
 	g.Go(func() error {
 		return a.Servir(ctx, lisHTTP,
 			api.Desligamento{Aviso: c.aviso, Prazo: c.prazo})

@@ -62,6 +62,9 @@ func executar(args []string, saida, erros io.Writer) int {
 		"rajada por namespace acima da taxa")
 	fs.IntVar(&c.emCurso, "max-em-curso", 32,
 		"requisições em curso antes de responder 503 (0: sem limite)")
+	fs.IntVar(&c.naFila, "max-na-fila", 100000,
+		"jobs esperando por namespace antes de responder 429 "+
+			"(0: sem limite)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}

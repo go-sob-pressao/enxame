@@ -28,6 +28,7 @@ type API struct {
 	// requisições em curso no processo. Zero desliga cada um.
 	Taxa, Rajada float64
 	MaxEmCurso   int
+	Fila         Fila
 	// encerrando é fechado quando o servidor começa a desligar: os
 	// long-polls param de esperar.
 	encerrando chan struct{}

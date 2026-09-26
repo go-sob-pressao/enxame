@@ -46,6 +46,15 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 	if !n.RunAt.IsZero() {
 		opts = append(opts, enxame.RunAt(n.RunAt))
 	}
+	cheia, err := a.filaCheia(r.Context(), namespace(r.Context()))
+	if err != nil {
+		a.erro(w, r, err)
+		return
+	}
+	if cheia {
+		recusarFilaCheia(w)
+		return
+	}
 	c := enxame.New(a.DB, namespace(r.Context()))
 	jid, err := c.Insert(r.Context(), brutos{n.Kind, args}, opts...)
 	if err != nil {

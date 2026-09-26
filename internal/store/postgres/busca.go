@@ -178,3 +178,14 @@ func (s *Store) emLote(
 	})
 	return n, err
 }
+
+// Esperando conta os jobs do namespace que esperam execução: prontos
+// ou aguardando o retry. Agendados para o futuro não contam — não são
+// atraso, são compromisso. Usa o índice job_consulta.
+func (s *Store) Esperando(ctx context.Context, ns string) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM job
+		WHERE namespace = $1 AND state IN ('available', 'retryable')`,
+		ns).Scan(&n)
+	return n, err
+}

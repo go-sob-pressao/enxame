@@ -224,3 +224,34 @@ func TestLongPollVoltaNoFim(t *testing.T) {
 		t.Fatalf("%d %s em %v", s, corpo, time.Since(inicio))
 	}
 }
+
+// livro:inicio fila-cheia-teste
+
+// Com dois jobs esperando, o terceiro do namespace é recusado; o de
+// outro namespace, não. Cancelar um libera a vaga.
+func TestFilaCheia(t *testing.T) {
+	a, _, c, outra := apiDeTeste(t)
+	a.Fila.Max = 2 // Validade zero: conta a cada job
+	novo := `{"queue":"q","kind":"eco"}`
+	var ids []string
+	for range 2 {
+		s, corpo := c.chamar("POST", "/v1/jobs", novo)
+		if s != 201 {
+			t.Fatalf("inserir: %d %s", s, corpo)
+		}
+		ids = append(ids, campo(t, corpo, "id"))
+	}
+	if s, corpo := c.chamar("POST", "/v1/jobs", novo); s != 429 ||
+		campo(t, corpo, "code") != "queue_full" {
+		t.Fatalf("terceiro: %d %s", s, corpo)
+	}
+	if s, _ := outra.chamar("POST", "/v1/jobs", novo); s != 201 {
+		t.Fatalf("outro namespace pagou pela fila cheia: %d", s)
+	}
+	c.chamar("POST", "/v1/jobs/"+ids[0]+"/cancel", "")
+	if s, _ := c.chamar("POST", "/v1/jobs", novo); s != 201 {
+		t.Fatalf("depois de cancelar: %d", s)
+	}
+}
+
+// livro:fim fila-cheia-teste
