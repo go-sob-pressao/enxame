@@ -4,9 +4,11 @@
 // — os dados da Figura 16.2 — e o pico em 10 ms.
 //
 //	go run ./examples/cap16/jitter > jitter.csv
+//	go run ./examples/cap16/jitter -clientes 100   (Experimento 20.1)
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -16,15 +18,19 @@ import (
 )
 
 func main() {
-	const clientes, tentativas = 1000, 5
+	clientes := flag.Int("clientes", 1000,
+		"clientes que falharam juntos")
+	tentativas := flag.Int("tentativas", 5,
+		"novas tentativas de cada um")
+	flag.Parse()
 	r := policy.Retry{Base: time.Second, Max: time.Minute}
 	sorte := rand.New(rand.NewPCG(16, 2)) // semente fixa: reproduzível
 	const faixa = 250 * time.Millisecond
 	sem, com := map[int]int{}, map[int]int{}
 	picoSem, picoCom := map[int]int{}, map[int]int{} // por 10 ms
-	for range clientes {
+	for range *clientes {
 		var t1, t2 time.Duration
-		for a := 1; a <= tentativas; a++ {
+		for a := 1; a <= *tentativas; a++ {
 			t1 += r.Teto(a)
 			t2 += r.Delay(a, sorte.Float64)
 			sem[int(t1/faixa)]++
