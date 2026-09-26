@@ -1,6 +1,9 @@
 package workflow
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // RunState é o estado de um run.
 type RunState string
@@ -23,4 +26,24 @@ type Run struct {
 	State      RunState
 	Output     json.RawMessage
 	Err        string
+}
+
+// Continuation é o pedido de uma nova execução do run, a partir de At,
+// para a posição Seq do histórico. O runtime a grava junto com o passo
+// que a exigiu, na mesma transação: ou os dois existem, ou nenhum.
+type Continuation struct {
+	Seq int
+	At  time.Time
+}
+
+// O job que avança um run: um por posição do histórico.
+const (
+	AdvanceKind  = "workflow.avancar"
+	AdvanceQueue = "workflow"
+)
+
+// AdvanceArgs são os argumentos do job que avança um run.
+type AdvanceArgs struct {
+	RunID string `json:"run_id"`
+	Seq   int    `json:"seq"`
 }

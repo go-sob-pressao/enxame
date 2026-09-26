@@ -39,19 +39,25 @@ type History interface {
 // Context é o que a função de workflow recebe. Cada chamada a Step,
 // Sleep, SideEffect ou Now ocupa a próxima posição do histórico.
 type Context struct {
-	ctx   context.Context
-	hist  History
-	seq   int
-	clock func() time.Time
+	ctx     context.Context
+	hist    History
+	seq     int
+	clock   func() time.Time
+	posicao int
 }
 
-// NewContext é usado pelo runtime que executa o workflow.
+// NewContext é usado pelo runtime que executa o workflow. Com posicao
+// zero, a execução avança por quantos passos novos encontrar. Com
+// posicao maior que zero, só a posição dada pode ser executada pela
+// primeira vez: ao chegar a outra posição nova, a execução para, e o
+// job daquela posição a executará.
 func NewContext(
 	ctx context.Context,
 	h History,
 	clock func() time.Time,
+	posicao int,
 ) *Context {
-	return &Context{ctx: ctx, hist: h, clock: clock}
+	return &Context{ctx: ctx, hist: h, clock: clock, posicao: posicao}
 }
 
 // Context devolve o context.Context da execução, para cancelamento.
@@ -62,6 +68,10 @@ func (c *Context) Context() context.Context { return c.ctx }
 func (c *Context) proximo(name string, k Kind) (Record, bool, error) {
 	c.seq++
 	r, ok := c.hist.Lookup(c.seq)
+	if !ok && c.posicao > 0 && c.seq != c.posicao {
+		// Outra posição nova: é trabalho de outro job.
+		return r, false, &SuspendedError{Until: c.clock()}
+	}
 	if !ok {
 		return Record{Seq: c.seq, Name: name, Kind: k}, false, nil
 	}

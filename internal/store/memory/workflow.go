@@ -64,6 +64,7 @@ func (w *Workflows) AppendStep(
 	_ context.Context,
 	runID string,
 	r workflow.Record,
+	_ workflow.Continuation, // sem fila de jobs em memória
 ) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

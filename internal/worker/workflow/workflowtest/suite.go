@@ -222,10 +222,11 @@ func mesmaPosicao(t *testing.T, s Store) {
 	id := iniciar(t, s, "f")
 	r := workflow.Record{Seq: 1, Name: "a", Kind: workflow.KindCall,
 		Output: json.RawMessage(`1`)}
-	if err := s.AppendStep(t.Context(), id, r); err != nil {
+	nenhuma := workflow.Continuation{}
+	if err := s.AppendStep(t.Context(), id, r, nenhuma); err != nil {
 		t.Fatal(err)
 	}
-	err := s.AppendStep(t.Context(), id, r)
+	err := s.AppendStep(t.Context(), id, r, nenhuma)
 	if !errors.Is(err, store.ErrConflict) {
 		t.Fatalf("segunda gravação: %v", err)
 	}

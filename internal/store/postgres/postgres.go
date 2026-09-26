@@ -40,21 +40,41 @@ func (s *Store) Insert(
 	evs []job.Event,
 ) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO job (job_id, partition_id,
-			namespace, queue, kind, args, unique_key, state, priority,
-			attempt, max_attempts, scheduled_at, attempted_at,
-			attempted_by, finalized_at, version)
-			VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-			        $12, $13, $14, 1)`,
-			j.ID.String(), j.Namespace, j.Queue, j.Kind, args(j.Args),
-			nulo(j.UniqueKey), string(j.State), j.Priority, j.Attempt,
-			j.MaxAttempts, j.ScheduledAt, instanteNulo(j.AttemptedAt),
-			nulo(j.AttemptedBy), instanteNulo(j.FinalizedAt))
-		if err != nil {
-			return traduzir(err)
-		}
-		return acrescentar(ctx, tx, j.ID, evs)
+		return inserir(ctx, tx, j, evs)
 	})
+}
+
+// InsertTx grava o job e o histórico na transação de quem chama: o job
+// passa a existir no COMMIT dela, e some no ROLLBACK.
+func (s *Store) InsertTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	j job.Job,
+	evs []job.Event,
+) error {
+	return inserir(ctx, tx, j, evs)
+}
+
+func inserir(
+	ctx context.Context,
+	tx pgx.Tx,
+	j job.Job,
+	evs []job.Event,
+) error {
+	_, err := tx.Exec(ctx, `INSERT INTO job (job_id, partition_id,
+		namespace, queue, kind, args, unique_key, state, priority,
+		attempt, max_attempts, scheduled_at, attempted_at,
+		attempted_by, finalized_at, version)
+		VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+		        $12, $13, $14, 1)`,
+		j.ID.String(), j.Namespace, j.Queue, j.Kind, args(j.Args),
+		nulo(j.UniqueKey), string(j.State), j.Priority, j.Attempt,
+		j.MaxAttempts, j.ScheduledAt, instanteNulo(j.AttemptedAt),
+		nulo(j.AttemptedBy), instanteNulo(j.FinalizedAt))
+	if err != nil {
+		return traduzir(err)
+	}
+	return acrescentar(ctx, tx, j.ID, evs)
 }
 
 // Get devolve a projeção e a versão.
