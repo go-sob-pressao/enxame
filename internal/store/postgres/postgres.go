@@ -122,47 +122,6 @@ func (s *Store) History(
 	return evs, rows.Err()
 }
 
-// Update grava a projeção se a versão ainda for version.
-func (s *Store) Update(
-	ctx context.Context,
-	j job.Job,
-	evs []job.Event,
-	version int64,
-) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(
-			ctx,
-			`UPDATE job SET state = $2, attempt = $3,
-			scheduled_at = $4, attempted_at = $5, attempted_by = $6,
-			finalized_at = $7, version = version + 1
-			WHERE job_id = $1 AND version = $8`,
-			j.ID.String(),
-			string(j.State),
-			j.Attempt,
-			j.ScheduledAt,
-			instanteNulo(j.AttemptedAt),
-			nulo(j.AttemptedBy),
-			instanteNulo(j.FinalizedAt),
-			version,
-		)
-		if err != nil {
-			return traduzir(err)
-		}
-		if tag.RowsAffected() == 0 {
-			var v int64
-			err := tx.QueryRow(ctx,
-				`SELECT version FROM job WHERE job_id = $1`,
-				j.ID.String()).Scan(&v)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return store.ErrNotFound
-			}
-			return fmt.Errorf("%w: gravada %d, esperada %d",
-				store.ErrConflict, v, version)
-		}
-		return acrescentar(ctx, tx, j.ID, evs)
-	})
-}
-
 // Next devolve o próximo disponível da fila, na ordem do índice
 // job_busca.
 func (s *Store) Next(
