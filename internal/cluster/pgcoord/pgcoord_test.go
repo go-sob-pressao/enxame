@@ -8,11 +8,19 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+
 	"github.com/go-sob-pressao/enxame/internal/cluster/coordinator"
 	"github.com/go-sob-pressao/enxame/internal/cluster/membership"
 	"github.com/go-sob-pressao/enxame/internal/cluster/pgcoord"
 	"github.com/go-sob-pressao/enxame/test/testutil"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m, goleak.IgnoreTopFunction(
+		"github.com/jackc/pgx/v5/pgxpool.(*Pool).backgroundHealthCheck",
+	))
+}
 
 // no é um nó do teste: o membership e o coordenador, que param juntos.
 type no struct {
