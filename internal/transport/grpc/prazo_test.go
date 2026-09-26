@@ -82,7 +82,8 @@ func TestPrazoAtravessaARede(t *testing.T) {
 	req := &enxamev1.HeartbeatRequest{
 		JobId: "0192a3b4-0000-7000-8000-000000000001", Attempt: 1}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(),
+		100*time.Millisecond)
 	defer cancel()
 	inicio := time.Now()
 	_, err := c.Heartbeat(ctx, req)
