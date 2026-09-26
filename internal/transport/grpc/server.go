@@ -3,7 +3,11 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
@@ -26,6 +30,21 @@ type Server struct {
 	Motor Motor
 	Poll  time.Duration // intervalo da busca quando não há job
 	Now   func() time.Time
+
+	once, once2 sync.Once
+	encerrando  chan struct{}
+}
+
+// Encerrar faz cada stream de busca terminar com UNAVAILABLE: o worker
+// reconecta — a outro nó, ou a este, depois do deploy. Sem isso, o
+// GracefulStop esperaria streams que só terminam quando o worker quer.
+func (s *Server) Encerrar() {
+	s.once.Do(func() { close(s.canal()) })
+}
+
+func (s *Server) canal() chan struct{} {
+	s.once2.Do(func() { s.encerrando = make(chan struct{}) })
+	return s.encerrando
 }
 
 // livro:inicio fetch
@@ -86,6 +105,8 @@ func (s *Server) Fetch(
 			}
 			credito += c
 		case <-time.After(s.Poll):
+		case <-s.canal():
+			return status.Error(codes.Unavailable, "motor desligando")
 		case <-ctx.Done():
 			return ctx.Err()
 		}

@@ -22,10 +22,10 @@ func TestExecutarVersao(t *testing.T) {
 
 func TestExecutarSemModoFalhaComMensagemClara(t *testing.T) {
 	var saida, erros bytes.Buffer
-	if code := executar(nil, &saida, &erros); code != 1 {
-		t.Fatalf("código = %d, want 1", code)
+	if code := executar(nil, &saida, &erros); code != 2 {
+		t.Fatalf("código = %d, want 2", code)
 	}
-	if !strings.Contains(erros.String(), "Capítulo 18") ||
+	if !strings.Contains(erros.String(), "-dsn") ||
 		!strings.Contains(erros.String(), "-demo") {
 		t.Errorf("mensagem não orienta o leitor: %q", erros.String())
 	}

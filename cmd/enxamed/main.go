@@ -3,15 +3,24 @@
 // Um único binário hospeda os papéis — api, worker, scheduler, delivery
 // e cluster. Quais ficam ativos é decidido pela configuração (ADR-008).
 //
-//	enxamed -demo 5    executa o M0: cinco jobs, um por vez
+//	enxamed -dsn postgres://…    modo servidor: API HTTP, gRPC dos
+//	                             workers remotos e o motor
+//	enxamed -demo 5              executa o M0: cinco jobs, um por vez
 //	enxamed -version
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 )
 
 // versao é preenchida no build: -ldflags "-X main.versao=v1.2.3".
@@ -28,9 +37,24 @@ func main() {
 func executar(args []string, saida, erros io.Writer) int {
 	fs := flag.NewFlagSet("enxamed", flag.ContinueOnError)
 	fs.SetOutput(erros)
-	config := fs.String("config", "", "arquivo de configuração do nó")
 	demo := fs.Int("demo", 0, "executa N jobs de exemplo no M0 e sai")
 	mostrarVersao := fs.Bool("version", false, "imprime a versão e sai")
+	var c config
+	fs.StringVar(&c.dsn, "dsn", os.Getenv("ENXAME_DB_DSN"),
+		"PostgreSQL (ENXAME_DB_DSN)")
+	fs.StringVar(&c.http, "http", ":8080", "endereço da API HTTP")
+	fs.StringVar(&c.grpc, "grpc", ":7233", "endereço do gRPC dos workers")
+	tokens := fs.String("tokens", os.Getenv("ENXAME_TOKENS"),
+		"token:namespace,… da API (ENXAME_TOKENS)")
+	fs.StringVar(&c.tokenWorker, "worker-token",
+		os.Getenv("ENXAME_WORKER_TOKEN"),
+		"token dos workers remotos (ENXAME_WORKER_TOKEN)")
+	fs.DurationVar(&c.aviso, "aviso", 5*time.Second,
+		"tempo de /readyz em 503 antes de parar de aceitar")
+	fs.DurationVar(&c.prazo, "prazo", 20*time.Second,
+		"teto para drenar as requisições no desligamento")
+	fs.DurationVar(&c.resgate, "resgate", time.Minute,
+		"prazo sem sinal de vida antes de resgatar uma tentativa")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -43,16 +67,44 @@ func executar(args []string, saida, erros io.Writer) int {
 	if *demo > 0 {
 		return demonstrar(*demo, saida, erros)
 	}
+	var err error
+	if c.tokens, err = lerTokens(*tokens); err != nil ||
+		c.dsn == "" || c.tokenWorker == "" {
+		fmt.Fprintf(erros, "enxamed %s: modo servidor precisa de "+
+			"-dsn, -tokens e -worker-token (ou use -demo N): %v\n",
+			versao, err)
+		return 2
+	}
+	// SIGTERM é o pedido de desligamento do orquestrador; SIGINT, o
+	// Ctrl+C de quem roda à mão.
+	ctx, parar := signal.NotifyContext(context.Background(),
+		syscall.SIGTERM, os.Interrupt)
+	defer parar()
+	log := slog.New(slog.NewJSONHandler(erros, nil))
+	var lc net.ListenConfig
+	lisHTTP, err := lc.Listen(ctx, "tcp", c.http)
+	if err == nil {
+		var lisGRPC net.Listener
+		if lisGRPC, err = lc.Listen(ctx, "tcp", c.grpc); err == nil {
+			err = servir(ctx, c, lisHTTP, lisGRPC, log)
+		}
+	}
+	if err != nil {
+		log.ErrorContext(ctx, "enxamed", slog.Any("erro", err))
+		return 1
+	}
+	return 0
+}
 
-	// Cap. 18: modo servidor, com workers remotos.
-	// Cap. 19: encerramento gracioso no SIGTERM.
-	// Cap. 32: drenagem de partições no preStop.
-	fmt.Fprintf(
-		erros,
-		"enxamed %s: o modo servidor entra no Capítulo 18; "+
-			"até lá, use -demo N (config: %q)\n",
-		versao,
-		*config,
-	)
-	return 1
+// lerTokens lê "token:namespace,token:namespace".
+func lerTokens(s string) (map[string]string, error) {
+	m := map[string]string{}
+	for par := range strings.SplitSeq(s, ",") {
+		tk, ns, ok := strings.Cut(strings.TrimSpace(par), ":")
+		if !ok || tk == "" || ns == "" {
+			return nil, fmt.Errorf("token inválido: %q", par)
+		}
+		m[tk] = ns
+	}
+	return m, nil
 }

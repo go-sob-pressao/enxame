@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"net/url"
 	"os"
 	"testing"
 
@@ -60,4 +61,18 @@ func aleatorio() string {
 	b := make([]byte, 6)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// PostgresDSN é o Postgres para quem precisa da string de conexão — um
+// binário, um servidor que abre o próprio pool. O banco é o mesmo tipo
+// de banco efêmero, já migrado.
+func PostgresDSN(t testing.TB) string {
+	t.Helper()
+	pool := Postgres(t)
+	u, err := url.Parse(os.Getenv("ENXAME_DB_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Path = "/" + pool.Config().ConnConfig.Database
+	return u.String()
 }
