@@ -85,10 +85,11 @@ func preparar(ctx context.Context) error {
 		return err
 	}
 	defer db.Close()
-	if _, err := db.Exec(ctx, `
+	_, err = db.Exec(ctx, `
 		CREATE TABLE efeito (chave TEXT PRIMARY KEY);
 		CREATE TABLE execucao (chave TEXT NOT NULL,
-		    em TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp());`); err != nil {
+		    em TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp());`)
+	if err != nil {
 		return err
 	}
 	c := enxame.New(db, namespace)
@@ -117,11 +118,12 @@ func efeito(ctx context.Context, db *pgxpool.Pool) error {
 		return ctx.Err()
 	}
 	return pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO execucao (chave) VALUES ($1)`, chave); err != nil {
+		_, err := tx.Exec(ctx,
+			`INSERT INTO execucao (chave) VALUES ($1)`, chave)
+		if err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO efeito (chave) VALUES ($1)
+		_, err = tx.Exec(ctx, `INSERT INTO efeito (chave) VALUES ($1)
 			ON CONFLICT (chave) DO NOTHING`, chave)
 		return err
 	})
@@ -133,6 +135,8 @@ func trabalhar(ctx context.Context) error {
 		return err
 	}
 	defer db.Close()
+	// O contexto do passo vem do workflow.Context.
+	//nolint:contextcheck
 	passo := func(c *workflow.Context, nome string) error {
 		_, err := workflow.Step(c, nome,
 			func(ctx context.Context) (bool, error) {
@@ -154,7 +158,8 @@ func trabalhar(ctx context.Context) error {
 		if err := passo(c, "cobrar"); err != nil {
 			return nil, err
 		}
-		if err := workflow.Sleep(c, "esperar", time.Second); err != nil {
+		err := workflow.Sleep(c, "esperar", time.Second)
+		if err != nil {
 			return nil, err
 		}
 		return nil, passo(c, "emitir-nota")

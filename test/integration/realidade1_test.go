@@ -27,7 +27,7 @@ func TestRealidade1(t *testing.T) {
 	rodar(t, "go", "build", "-o", bin, "../../examples/cap17/realidade")
 	rodar(t, bin, "preparar")
 
-	primeiro := exec.Command(bin, "trabalhar")
+	primeiro := exec.CommandContext(t.Context(), bin, "trabalhar")
 	if err := primeiro.Start(); err != nil {
 		t.Fatal(err)
 	}
