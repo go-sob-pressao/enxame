@@ -3,6 +3,7 @@
 package portas
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -50,8 +51,7 @@ func NovoEndpoint(lento bool) *Endpoint {
 
 // EntregarIngenuo só quer o status: fecha o corpo sem ler.
 func EntregarIngenuo(c *http.Client, url string) (int, error) {
-	resp, err := c.Post(url, "application/json",
-		strings.NewReader(`{"type":"pedido.pago"}`))
+	resp, err := postar(c, url)
 	if err != nil {
 		return 0, err
 	}
@@ -62,8 +62,7 @@ func EntregarIngenuo(c *http.Client, url string) (int, error) {
 // Entregar lê o corpo até o fim — com teto — antes de fechar: é o que
 // devolve a conexão ao pool do Transport para a próxima entrega.
 func Entregar(c *http.Client, url string) (int, error) {
-	resp, err := c.Post(url, "application/json",
-		strings.NewReader(`{"type":"pedido.pago"}`))
+	resp, err := postar(c, url)
 	if err != nil {
 		return 0, err
 	}
@@ -76,10 +75,20 @@ func Entregar(c *http.Client, url string) (int, error) {
 
 // EntregarSemFechar esquece o corpo de vez: nem lê, nem fecha.
 func EntregarSemFechar(c *http.Client, url string) (int, error) {
-	resp, err := c.Post(url, "application/json",
-		strings.NewReader(`{"type":"pedido.pago"}`))
+	resp, err := postar(c, url) //nolint:bodyclose // o defeito
 	if err != nil {
 		return 0, err
 	}
-	return resp.StatusCode, nil //nolint:bodyclose // o defeito
+	return resp.StatusCode, nil
+}
+
+func postar(c *http.Client, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(context.Background(),
+		http.MethodPost, url,
+		strings.NewReader(`{"type":"pedido.pago"}`))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return c.Do(req)
 }
