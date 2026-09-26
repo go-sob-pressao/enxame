@@ -55,6 +55,8 @@ func servir(
 			api.Desligamento{Aviso: c.aviso, Prazo: c.prazo})
 	})
 
+	// Cada chamada traz o próprio contexto, do stream.
+	//nolint:contextcheck
 	srv := grpc.NewServer(tgrpc.Servidor(c.tokenWorker, log)...)
 	workers := &tgrpc.Server{Motor: s, Poll: 200 * time.Millisecond,
 		Now: time.Now}

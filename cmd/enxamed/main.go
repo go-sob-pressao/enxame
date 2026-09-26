@@ -43,7 +43,8 @@ func executar(args []string, saida, erros io.Writer) int {
 	fs.StringVar(&c.dsn, "dsn", os.Getenv("ENXAME_DB_DSN"),
 		"PostgreSQL (ENXAME_DB_DSN)")
 	fs.StringVar(&c.http, "http", ":8080", "endereço da API HTTP")
-	fs.StringVar(&c.grpc, "grpc", ":7233", "endereço do gRPC dos workers")
+	fs.StringVar(&c.grpc, "grpc", ":7233",
+		"endereço do gRPC dos workers")
 	tokens := fs.String("tokens", os.Getenv("ENXAME_TOKENS"),
 		"token:namespace,… da API (ENXAME_TOKENS)")
 	fs.StringVar(&c.tokenWorker, "worker-token",
