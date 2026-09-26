@@ -119,7 +119,7 @@ func (w *Worker) Workflow(tipo string, fn Workflow) {
 // órfãs — todos sob o mesmo errgroup, que cancela os outros quando um
 // falha.
 func (w *Worker) Run(ctx context.Context) error {
-	s := w.c.store
+	s := w.c.store.RelogioDoBanco()
 	g, ctx := errgroup.WithContext(ctx)
 	filas := map[string]map[string]runner.Handler{}
 	for q := range w.cfg.Queues {

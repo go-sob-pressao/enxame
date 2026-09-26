@@ -19,6 +19,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/delivery"
+	"github.com/go-sob-pressao/enxame/internal/engine/partition"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	tgrpc "github.com/go-sob-pressao/enxame/internal/transport/grpc"
 	enxamev1 "github.com/go-sob-pressao/enxame/internal/transport/grpc/gen/enxame/v1"
@@ -37,6 +38,7 @@ type config struct {
 	taxa, rajada    float64
 	emCurso, naFila int
 	no              string
+	leaseMotor      time.Duration
 }
 
 // livro:inicio servir
@@ -59,10 +61,12 @@ func servir(
 	if err := postgres.Migrate(ctx, db); err != nil {
 		return err
 	}
-	s := postgres.New(db)
+	// Um relógio só para todos os nós: o do banco (Caps. 22 e 24).
+	s := postgres.New(db).RelogioDoBanco()
 	g, ctx := errgroup.WithContext(ctx)
+	no := nomeDoNo(c.no)
 
-	m := membership.Novo(membership.Config{No: nomeDoNo(c.no),
+	m := membership.Novo(membership.Config{No: no,
 		Endereco: lisHTTP.Addr().String(), DB: db, Log: log})
 	g.Go(func() error { return m.Run(ctx) })
 
@@ -89,7 +93,16 @@ func servir(
 		return nil
 	})
 
-	g.Go(func() error { return motor(ctx, s, c.resgate) })
+	// O motor — promover, resgatar, disparar — é do dono da partição 0,
+	// e cada transação dele confere o token (ADR-005).
+	dono := partition.Dono{Particao: 0, Log: log,
+		Lease: partition.Lease{DB: db, No: string(no),
+			Duracao: c.leaseMotor}}
+	doMotor := func(ctx context.Context, token int64) error {
+		return motor(ctx, s.ComCerca(postgres.Cerca{Particao: 0,
+			RangeID: token}), c.resgate)
+	}
+	g.Go(func() error { return dono.Run(ctx, doMotor) })
 	g.Go(func() error { return entregar(ctx, s, log) })
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
