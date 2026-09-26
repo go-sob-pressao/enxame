@@ -3,10 +3,35 @@
 package dualwrite_test
 
 import (
+	"context"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/go-sob-pressao/enxame/examples/cap15/dualwrite"
 )
+
+// cobranca é o consumidor da fila: recebe o id e procura o pedido.
+type cobranca struct {
+	db        *pgxpool.Pool
+	cobrados  []int
+	fantasmas []int // mensagens de pedidos que não estavam no banco
+}
+
+func (c *cobranca) Publicar(ctx context.Context, id int) error {
+	var n int
+	err := c.db.QueryRow(ctx,
+		`SELECT count(*) FROM pedido WHERE id = $1`, id).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		c.fantasmas = append(c.fantasmas, id)
+		return nil
+	}
+	c.cobrados = append(c.cobrados, id)
+	return nil
+}
 
 // livro:inicio dual-write-teste
 
