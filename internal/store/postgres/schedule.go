@@ -12,7 +12,10 @@ import (
 )
 
 // UpsertSchedule cria ou substitui um agendamento.
-func (s *Store) UpsertSchedule(ctx context.Context, sc store.Schedule) error {
+func (s *Store) UpsertSchedule(
+	ctx context.Context,
+	sc store.Schedule,
+) error {
 	_, err := s.pool.Exec(ctx, `INSERT INTO schedule (namespace,
 		schedule_id, cron_expr, timezone, queue, kind, args,
 		next_fire_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -34,7 +37,8 @@ func (s *Store) UpsertSchedule(ctx context.Context, sc store.Schedule) error {
 func (s *Store) FireDue(
 	ctx context.Context,
 	now time.Time,
-	decidir func(store.Schedule, time.Time) (job.Spec, time.Time, error),
+	decidir func(store.Schedule, time.Time) (
+		job.Spec, time.Time, error),
 ) (disparados, absorvidos int, err error) {
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		vencidos, err := vencidos(ctx, tx, now)

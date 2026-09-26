@@ -74,9 +74,11 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	for {
 		d, a, err := s.Store.FireDue(ctx, s.Now(), Disparo)
 		if err != nil {
-			s.Log.Error("disparo de agendamentos", "erro", err)
+			s.Log.ErrorContext(ctx, "disparo de agendamentos",
+				"erro", err)
 		} else if d+a > 0 {
-			s.Log.Info("agendamentos", "disparados", d, "absorvidos", a)
+			s.Log.InfoContext(ctx, "agendamentos",
+				"disparados", d, "absorvidos", a)
 		}
 		select {
 		case <-t.C:

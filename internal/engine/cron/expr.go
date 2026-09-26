@@ -8,8 +8,8 @@ import (
 )
 
 // Expr é uma expressão cron de cinco campos: minuto, hora, dia do mês,
-// mês e dia da semana (0 = domingo). Cada campo aceita *, listas (1,15),
-// intervalos (9-17) e passos (*/5, 0-30/10).
+// mês e dia da semana (0 = domingo). Cada campo aceita *, listas
+// (1,15), intervalos (9-17) e passos (*/5, 0-30/10).
 type Expr struct {
 	minuto, hora, dia, mes, semana [60]bool
 	diaLivre, semanaLivre          bool
