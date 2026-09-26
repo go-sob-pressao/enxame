@@ -9,7 +9,7 @@ LDFLAGS := -s -w -X main.versao=$(VERSAO)
 PKGS    := ./...
 
 .DEFAULT_GOAL := help
-.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto ferramentas-proto clean defeitos
+.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto openapi ferramentas-proto clean defeitos
 
 help:            ## lista os alvos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -84,6 +84,9 @@ down:
 proto:           ## gera código gRPC com buf e plugins locais (Cap. 18)
 	buf lint
 	buf generate
+
+openapi:         ## gera api/openapi.json a partir das rotas (Cap. 19)
+	$(GO) run ./tools/openapi > api/openapi.json
 
 ferramentas-proto: ## instala buf e os plugins nas versões fixadas
 	$(GO) install github.com/bufbuild/buf/cmd/buf@v1.73.0

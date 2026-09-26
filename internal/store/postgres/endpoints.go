@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -76,7 +77,8 @@ func (s *Store) DisableEndpoint(
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return store.ErrNotFound
+		return fmt.Errorf("%w: endpoint %s inexistente ou já desativado",
+			store.ErrNotFound, id)
 	}
 	return nil
 }

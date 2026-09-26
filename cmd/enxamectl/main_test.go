@@ -6,9 +6,12 @@ import (
 	"testing"
 )
 
+func semAmbiente(string) string { return "" }
+
 func TestExecutarVersao(t *testing.T) {
 	var saida, erros bytes.Buffer
-	if code := executar([]string{"version"}, &saida, &erros); code != 0 {
+	code := executar([]string{"version"}, &saida, &erros, semAmbiente)
+	if code != 0 {
 		t.Fatalf("código = %d, want 0", code)
 	}
 	if got := strings.TrimSpace(saida.String()); got != "enxamectl dev" {
@@ -16,12 +19,19 @@ func TestExecutarVersao(t *testing.T) {
 	}
 }
 
-func TestExecutarComandoAindaNaoConstruido(t *testing.T) {
+func TestComandoDesconhecido(t *testing.T) {
 	var saida, erros bytes.Buffer
-	if code := executar([]string{"job", "insert"}, &saida, &erros); code != 1 {
-		t.Fatalf("código = %d, want 1", code)
+	code := executar([]string{"job", "voar"}, &saida, &erros, semAmbiente)
+	if code != 2 {
+		t.Fatalf("código = %d, want 2", code)
 	}
-	if !strings.Contains(erros.String(), "Capítulo 19") {
-		t.Errorf("mensagem não aponta o capítulo: %q", erros.String())
+}
+
+func TestFlagObrigatoria(t *testing.T) {
+	var saida, erros bytes.Buffer
+	code := executar([]string{"job", "insert", "--queue", "q"},
+		&saida, &erros, semAmbiente)
+	if code != 1 || !strings.Contains(erros.String(), "--kind") {
+		t.Fatalf("código %d, erro %q", code, erros.String())
 	}
 }
