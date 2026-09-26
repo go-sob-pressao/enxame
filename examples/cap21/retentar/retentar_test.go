@@ -9,10 +9,18 @@ import (
 
 var errFora = errors.New("destino fora do ar")
 
+// fila é o que a simulação usa das duas filas.
+type fila interface {
+	Oferecer(retentar.Item) bool
+	Processar(func(retentar.Item) error)
+	Reenviar()
+	Tamanho() (canal, retentar int)
+}
+
 // simular roda passos de 1 ms com o destino fora do ar: a cada passo,
 // o produtor oferece 3 itens e o consumidor processa 2; os que falham
 // voltam ao canal a cada 100 passos — a espera antes de retentar.
-func simular(t *testing.T, f *retentar.Fila, passos int) {
+func simular(t *testing.T, f fila, passos int) {
 	t.Helper()
 	aceitos, recusados := 0, 0
 	for p := range passos {
@@ -52,7 +60,7 @@ func TestFilaLimitadaCresce(t *testing.T) {
 
 // Com o limite no sistema inteiro, retentar para de crescer.
 func TestLimiteNoSistema(t *testing.T) {
-	f := retentar.Limitada(10000, 10000)
+	f := retentar.NovaLimitada(10000, 10000)
 	simular(t, f, 30000)
 	if c, r := f.Tamanho(); c+r > 10000 {
 		t.Fatalf("canal %d, retentar %d", c, r)

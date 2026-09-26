@@ -20,32 +20,14 @@ type Fila struct {
 	canal    chan Item
 	mu       sync.Mutex
 	retentar []Item
-	// emSistema, se não for nil, limita os itens em qualquer lugar da
-	// fila: no canal, em processamento ou esperando para retentar.
-	emSistema chan struct{}
-}
-
-// Nova cria a fila com vagas no canal.
-func Nova(vagas int) *Fila {
-	return &Fila{canal: make(chan Item, vagas)}
 }
 
 // Oferecer põe o item no canal, se houver vaga.
 func (f *Fila) Oferecer(it Item) bool {
-	if f.emSistema != nil {
-		select {
-		case f.emSistema <- struct{}{}:
-		default:
-			return false
-		}
-	}
 	select {
 	case f.canal <- it:
 		return true
 	default:
-		if f.emSistema != nil {
-			<-f.emSistema
-		}
 		return false
 	}
 }
@@ -59,10 +41,6 @@ func (f *Fila) Processar(h func(Item) error) {
 			f.mu.Lock()
 			f.retentar = append(f.retentar, it)
 			f.mu.Unlock()
-			return
-		}
-		if f.emSistema != nil {
-			<-f.emSistema
 		}
 	default:
 	}
@@ -84,12 +62,9 @@ func (f *Fila) Reenviar() {
 
 // livro:fim enigma
 
-// Limitada é a correção: o limite vale para o sistema inteiro, e um
-// item só devolve a vaga quando termina.
-func Limitada(vagas, total int) *Fila {
-	f := Nova(vagas)
-	f.emSistema = make(chan struct{}, total)
-	return f
+// Nova cria a fila com vagas no canal.
+func Nova(vagas int) *Fila {
+	return &Fila{canal: make(chan Item, vagas)}
 }
 
 // Tamanho devolve os itens no canal e os que esperam para retentar.
@@ -98,3 +73,45 @@ func (f *Fila) Tamanho() (canal, retentar int) {
 	defer f.mu.Unlock()
 	return len(f.canal), len(f.retentar)
 }
+
+// livro:inicio correcao
+
+// Limitada põe o limite no sistema inteiro: a vaga é tomada na
+// admissão e só volta quando o item termina com sucesso — esperar para
+// retentar não devolve a vaga.
+type Limitada struct {
+	*Fila
+	emSistema chan struct{}
+}
+
+// NovaLimitada cria a fila com vagas no canal e total no sistema.
+func NovaLimitada(vagas, total int) *Limitada {
+	return &Limitada{Nova(vagas), make(chan struct{}, total)}
+}
+
+// Oferecer admite o item só se houver vaga no sistema e no canal.
+func (l *Limitada) Oferecer(it Item) bool {
+	select {
+	case l.emSistema <- struct{}{}:
+	default:
+		return false
+	}
+	if !l.Fila.Oferecer(it) {
+		<-l.emSistema
+		return false
+	}
+	return true
+}
+
+// Processar devolve a vaga do sistema quando h termina sem erro.
+func (l *Limitada) Processar(h func(Item) error) {
+	l.Fila.Processar(func(it Item) error {
+		err := h(it)
+		if err == nil {
+			<-l.emSistema
+		}
+		return err
+	})
+}
+
+// livro:fim correcao
