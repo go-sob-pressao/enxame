@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -23,6 +25,10 @@ type no struct {
 	lease partition.Lease
 	cerca bool // confere o token em cada escrita
 	log   func(string, ...any)
+	// pausarEm, se positivo, faz o processo parar a si mesmo com
+	// SIGSTOP logo antes de escrever o lançamento com esse número: a
+	// pausa no pior instante, sempre o mesmo, para o teste.
+	pausarEm int
 }
 
 // livro:inicio lease-ingenuo
@@ -39,6 +45,7 @@ func (n *no) servir(ctx context.Context, token int64) error {
 	renovado := time.Now()
 	for ctx.Err() == nil {
 		seq++
+		n.talvezPausar(seq)
 		if err := n.escrever(ctx, seq, token); err != nil {
 			return err
 		}
@@ -76,6 +83,15 @@ func (n *no) escrever(ctx context.Context, seq int, token int64) error {
 }
 
 // livro:fim escrever
+
+// talvezPausar para o processo antes do lançamento seq, se pedido.
+func (n *no) talvezPausar(seq int) {
+	if seq != n.pausarEm {
+		return
+	}
+	n.log("pausando antes de escrever o lançamento %d", seq)
+	_ = syscall.Kill(os.Getpid(), syscall.SIGSTOP)
+}
 
 func (n *no) ultimo(ctx context.Context) (int, error) {
 	var seq int

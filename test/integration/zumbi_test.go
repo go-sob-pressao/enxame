@@ -47,8 +47,9 @@ func processo(t *testing.T, bin string, args ...string) (*exec.Cmd,
 
 // livro:inicio zumbi-teste
 
-// O dono A é pausado com SIGSTOP depois de escrever; B assume quando o
-// lease de A vence; A volta com SIGCONT. Sem cerca, A escreve com a
+// O dono A para a si mesmo com SIGSTOP antes de escrever o lançamento
+// 6, com tudo conferido; B assume quando o lease de A vence; A volta
+// com SIGCONT. Sem cerca, A escreve com a
 // numeração que tinha na memória, e o extrato ganha números repetidos.
 // Com cerca, a primeira escrita de A depois da pausa é recusada.
 func TestZumbi(t *testing.T) {
@@ -70,13 +71,13 @@ func TestZumbi(t *testing.T) {
 				}
 				return a
 			}
-			a, linhasA := processo(t, bin, args("a")...)
+			a, linhasA := processo(t, bin,
+				append(args("a"), "-pausar-em", "6")...)
 			escritas := func(no string) int {
 				return contar(t, db, `SELECT count(*) FROM extrato
 					WHERE no = '`+no+`'`)
 			}
-			esperar(t, func() bool { return escritas("a") >= 5 })
-			_ = a.Process.Signal(syscall.SIGSTOP)
+			esperarLinha(t, linhasA, "pausando")
 			processo(t, bin, args("b")...)
 			esperar(t, func() bool { return escritas("b") >= 10 })
 			_ = a.Process.Signal(syscall.SIGCONT)

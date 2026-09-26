@@ -6,6 +6,11 @@
 //	go run ./examples/cap24/zumbi -no a [-cerca] &
 //	kill -STOP %1; go run ./examples/cap24/zumbi -no b [-cerca] &
 //	kill -CONT %1
+//
+// Com -pausar-em N, o processo para a si mesmo antes de escrever o
+// lançamento N: depois de conferir tudo o que confere, e antes da
+// escrita.
+//
 //	go run ./examples/cap24/zumbi conferir
 package main
 
@@ -29,6 +34,8 @@ func main() {
 	nome := flag.String("no", "a", "nome deste nó")
 	cerca := flag.Bool("cerca", false, "conferir o token ao escrever")
 	duracao := flag.Duration("lease", time.Second, "duração do lease")
+	pausar := flag.Int("pausar-em", 0,
+		"parar com SIGSTOP antes de escrever este lançamento")
 	flag.Parse()
 	ctx, parar := signal.NotifyContext(context.Background(),
 		syscall.SIGTERM, os.Interrupt)
@@ -44,7 +51,7 @@ func main() {
 	case "conferir":
 		sair(conferir(ctx, db))
 	}
-	n := &no{db: db, cerca: *cerca,
+	n := &no{db: db, cerca: *cerca, pausarEm: *pausar,
 		lease: partition.Lease{DB: db, No: *nome, Duracao: *duracao},
 		log: func(f string, a ...any) {
 			fmt.Printf("%s %s: %s\n", time.Now().Format("15:04:05.000"),
