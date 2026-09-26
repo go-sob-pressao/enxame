@@ -14,18 +14,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/go-sob-pressao/enxame/internal/core/job"
-	"github.com/go-sob-pressao/enxame/internal/store/postgres"
-	"github.com/go-sob-pressao/enxame/internal/worker"
-	"github.com/go-sob-pressao/enxame/internal/worker/runner"
+	"github.com/go-sob-pressao/enxame/examples/internal/exemplo"
 	"github.com/go-sob-pressao/enxame/pkg/enxame"
 )
 
@@ -79,7 +74,7 @@ func criarPedido(
 
 func main() {
 	ctx := context.Background()
-	db, err := abrir(ctx, os.Getenv("ENXAME_DB_DSN"))
+	db, err := abrir(ctx)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -104,69 +99,24 @@ func resultado(err error) string {
 	return "gravado, com a cobrança"
 }
 
-// trabalhar roda um worker até a fila da cobrança esvaziar.
+// trabalhar roda o worker embutido até a fila esvaziar.
 func trabalhar(ctx context.Context, db *pgxpool.Pool) error {
-	s := postgres.New(db)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	p := &worker.Pool{
-		Queue: postgres.NewFila(ctx, s), QueueName: "default",
-		Concurrency: 2,
-		Handlers: map[string]runner.Handler{
-			"cobrar-pedido": func(_ context.Context, j job.Job) error {
-				fmt.Printf("worker: cobrando %s\n", j.Args)
-				return nil
-			},
-		},
-		PollTimeout: time.Second, AttemptTimeout: 10 * time.Second,
-		RetryDelay: time.Second, ReportEvery: time.Hour,
-		Worker: "exemplo-02", Now: time.Now,
-		Log: slog.New(slog.DiscardHandler),
-	}
-	go func() {
-		for ctx.Err() == nil {
-			var n int
-			_ = db.QueryRow(ctx, `SELECT count(*) FROM job
-				WHERE namespace = 'exemplo-02'
-				  AND state <> 'completed'`).Scan(&n)
-			if n == 0 {
-				cancel()
-			}
-			<-time.After(100 * time.Millisecond)
-		}
-	}()
-	if err := p.Run(ctx); !errors.Is(err, context.Canceled) {
-		return err
-	}
-	return nil
+	go exemplo.Esperar(ctx, db, cancel)
+	w := enxame.New(db, "exemplo-02").NewWorker(enxame.WorkerConfig{})
+	w.Handle("cobrar-pedido", func(_ context.Context,
+		j enxame.Job) error {
+		fmt.Printf("worker: cobrando %s\n", j.Args)
+		return nil
+	})
+	return w.Run(ctx)
 }
 
-// abrir recria o banco próprio do exemplo a cada execução.
-func abrir(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	const banco = "enxame_exemplo02"
-	admin, err := pgx.Connect(ctx, dsn)
+// abrir recria o banco do exemplo e cria as tabelas da aplicação.
+func abrir(ctx context.Context) (*pgxpool.Pool, error) {
+	db, err := exemplo.Banco(ctx, "enxame_exemplo02")
 	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = admin.Close(ctx) }()
-	for _, sql := range []string{
-		"DROP DATABASE IF EXISTS " + banco + " WITH (FORCE)",
-		"CREATE DATABASE " + banco,
-	} {
-		if _, err := admin.Exec(ctx, sql); err != nil {
-			return nil, err
-		}
-	}
-	cfg, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		return nil, err
-	}
-	cfg.ConnConfig.Database = banco
-	db, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	if err := postgres.Migrate(ctx, db); err != nil {
 		return nil, err
 	}
 	_, err = db.Exec(ctx, `

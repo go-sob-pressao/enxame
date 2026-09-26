@@ -1,24 +1,19 @@
 # 04 — Workflow de pedido (saga)
 
-Reservar estoque → cobrar → emitir nota → notificar. Se a cobrança falhar,
-compensa a reserva. Cada passo é memoizado: se o processo morrer entre a
-cobrança e a nota, o replay não cobra de novo (ADR-002).
+Reservar estoque → cobrar → esperar o prazo de arrependimento → emitir a
+nota. Se a cobrança for recusada, compensa a reserva. Cada passo é memoizado:
+se o processo morrer entre a cobrança e a nota, o replay não cobra de novo
+(ADR-002), e a cobrança recebe a mesma chave de idempotência em cada
+tentativa (`job.IdempotencyKey`).
 
 ```go
-func ProcessarPedido(ctx workflow.Context, p Pedido) error {
-    reserva, err := workflow.Step(ctx, "reservar", func(ctx context.Context) (Reserva, error) {
-        return estoque.Reservar(ctx, p.Itens)
-    })
-    if err != nil {
-        return err
-    }
-    if _, err := workflow.Step(ctx, "cobrar", cobrar(p)); err != nil {
-        workflow.Step(ctx, "liberar-reserva", liberar(reserva))
-        return err
-    }
-    pago, _ := workflow.WaitSignal[Confirmacao](ctx, "pagamento-confirmado", 48*time.Hour)
-    ...
-}
+w := client.NewWorker(enxame.WorkerConfig{})
+w.Workflow("pedido", ProcessarPedido)
+client.StartWorkflow(ctx, "pedido", pedido.ID, pedido)
 ```
 
-**Capítulos 14 e 17.**
+```bash
+go run ./examples/04-workflow-pedido
+```
+
+**Capítulos 14, 15 e 17.** Sinais (`WaitSignal`) ainda não existem no runtime.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/store"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	"github.com/go-sob-pressao/enxame/pkg/webhook"
@@ -127,4 +128,79 @@ func (c *Client) StartWorkflowTx(
 		Namespace: c.namespace, WorkflowID: workflowID, Type: tipo,
 		Input: in,
 	})
+}
+
+// StartWorkflow inicia um run numa transação própria.
+func (c *Client) StartWorkflow(
+	ctx context.Context,
+	tipo, workflowID string,
+	input any,
+) (string, error) {
+	var runID string
+	err := pgx.BeginFunc(ctx, c.pool, func(tx pgx.Tx) error {
+		var err error
+		runID, err = c.StartWorkflowTx(ctx, tx, tipo, workflowID, input)
+		return err
+	})
+	return runID, err
+}
+
+// Schedule é um agendamento periódico.
+type Schedule struct {
+	ID       string
+	Cron     string // cinco campos: minuto hora dia mês dia-da-semana
+	Timezone string // "UTC" se vazio
+	Queue    string // "default" se vazio
+	Args     Args
+}
+
+// Schedule cria ou substitui um agendamento; a primeira janela é a
+// próxima depois de agora.
+func (c *Client) Schedule(ctx context.Context, s Schedule) error {
+	if s.Timezone == "" {
+		s.Timezone = "UTC"
+	}
+	if s.Queue == "" {
+		s.Queue = "default"
+	}
+	e, err := schedule.Parse(s.Cron)
+	if err != nil {
+		return err
+	}
+	loc, err := time.LoadLocation(s.Timezone)
+	if err != nil {
+		return err
+	}
+	a, err := json.Marshal(s.Args)
+	if err != nil {
+		return err
+	}
+	return c.store.UpsertSchedule(ctx, schedule.Schedule{
+		Namespace: c.namespace, ID: s.ID, Expr: s.Cron,
+		Timezone: s.Timezone, Queue: s.Queue, Kind: s.Args.Kind(),
+		Args: a, NextFire: e.Next(time.Now(), loc),
+	})
+}
+
+// Migrate leva o esquema do Enxame, no banco da aplicação, à última
+// versão. Pode rodar a cada início: aplica só o que falta.
+func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	return postgres.Migrate(ctx, pool)
+}
+
+// RunResult é o estado de um run de workflow.
+type RunResult struct {
+	State  string // running, completed, failed
+	Output json.RawMessage
+	Err    string
+}
+
+// WorkflowResult devolve o estado de um run.
+func (c *Client) WorkflowResult(
+	ctx context.Context,
+	runID string,
+) (RunResult, error) {
+	run, _, err := c.store.LoadRun(ctx, runID)
+	return RunResult{State: string(run.State), Output: run.Output,
+		Err: run.Err}, err
 }
