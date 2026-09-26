@@ -37,7 +37,8 @@ func main() {
 	for f := range 32 * 4 {
 		fmt.Printf("%.2f,%d,%d\n", float64(f)/4, sem[f], com[f])
 	}
-	fmt.Fprintf(os.Stderr, "pico em 10 ms: sem jitter %d, com jitter %d\n",
+	fmt.Fprintf(os.Stderr,
+		"pico em 10 ms: sem jitter %d, com jitter %d\n",
 		maximo(picoSem), maximo(picoCom))
 }
 
