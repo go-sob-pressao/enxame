@@ -70,5 +70,5 @@ func (a *API) desativarEndpoint(
 func paraEndpoint(e webhook.Endpoint) Endpoint {
 	return Endpoint{ID: e.ID, URL: e.URL, Description: e.Description,
 		EventTypes: e.EventTypes, SecretRef: e.SecretRef,
-		Disabled: e.Disabled, CreatedAt: e.CreatedAt}
+		Disabled: e.Disabled, CreatedAt: e.CreatedAt.UTC()}
 }

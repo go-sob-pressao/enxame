@@ -138,6 +138,6 @@ func (a *API) cancelarJob(w http.ResponseWriter, r *http.Request) {
 func paraJob(j job.Job) Job {
 	return Job{ID: j.ID.String(), Queue: j.Queue, Kind: j.Kind,
 		Args: j.Args, State: string(j.State), Attempt: j.Attempt,
-		MaxAttempts: j.MaxAttempts, ScheduledAt: j.ScheduledAt,
-		LastError: j.LastError, FinalizedAt: j.FinalizedAt}
+		MaxAttempts: j.MaxAttempts, ScheduledAt: j.ScheduledAt.UTC(),
+		LastError: j.LastError, FinalizedAt: j.FinalizedAt.UTC()}
 }

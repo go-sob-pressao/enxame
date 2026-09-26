@@ -103,10 +103,14 @@ func (a *API) Registrar(prox http.Handler) http.Handler {
 		r *http.Request) {
 		inicio := time.Now()
 		rw := &comStatus{ResponseWriter: w, status: http.StatusOK}
-		prox.ServeHTTP(rw, r)
+		// O padrão da rota só é conhecido depois que o ServeMux escolhe
+		// o handler, lá dentro; anotarRota o devolve por aqui.
+		rota := new(string)
+		ctx := context.WithValue(r.Context(), chaveRota{}, rota)
+		prox.ServeHTTP(rw, r.WithContext(ctx))
 		a.Log.InfoContext(r.Context(), "http",
 			slog.String("metodo", r.Method),
-			slog.String("rota", r.Pattern),
+			slog.String("rota", *rota),
 			slog.Int("status", rw.status),
 			slog.Duration("duracao", time.Since(inicio)))
 	})
@@ -120,4 +124,17 @@ type comStatus struct {
 func (c *comStatus) WriteHeader(s int) {
 	c.status = s
 	c.ResponseWriter.WriteHeader(s)
+}
+
+type chaveRota struct{}
+
+// anotarRota guarda o padrão da rota escolhida para o Registrar.
+func anotarRota(prox http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter,
+		r *http.Request) {
+		if rota, ok := r.Context().Value(chaveRota{}).(*string); ok {
+			*rota = r.Pattern
+		}
+		prox.ServeHTTP(w, r)
+	})
 }

@@ -62,6 +62,7 @@ func (a *API) Handler() http.Handler {
 		if !r.Publica {
 			h = Encadear(h, a.Autenticar, LimitarCorpo(1<<20))
 		}
+		h = anotarRota(h)
 		mux.Handle(r.Padrao, h)
 	}
 	return Encadear(mux, a.Recuperar, a.Registrar,
