@@ -129,7 +129,8 @@ func (w *Worker) Run(ctx context.Context) error {
 		p := &worker.Pool{
 			Queue: postgres.NewFila(ctx, s), QueueName: q,
 			Handlers: hs, Concurrency: max(w.cfg.Queues[q], 2),
-			PollTimeout: 5 * time.Second, AttemptTimeout: w.cfg.RescueAfter,
+			PollTimeout:    5 * time.Second,
+			AttemptTimeout: w.cfg.RescueAfter,
 			Backoff: func(a int) time.Duration {
 				return retry.Delay(a, rand.Float64)
 			},

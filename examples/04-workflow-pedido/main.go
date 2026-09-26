@@ -127,7 +127,7 @@ func rodar(ctx context.Context) error {
 	if err := w.Run(ctx); err != nil {
 		return err
 	}
-	ctx = context.WithoutCancel(ctx) // o worker terminou; a leitura, não
+	ctx = context.WithoutCancel(ctx) // o worker acabou; a leitura, não
 	for _, id := range runs {
 		r, err := client.WorkflowResult(ctx, id)
 		if err != nil {
