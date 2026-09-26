@@ -172,12 +172,13 @@ func TestDesligamentoAcordaLongPoll(t *testing.T) {
 			Aviso: 200 * time.Millisecond, Prazo: 10 * time.Second})
 	}()
 	c := cliente{t, "http://" + lis.Addr().String(), "tk"}
-	_, corpo := c.chamar("POST", "/v1/jobs", `{"queue":"q","kind":"eco"}`)
+	_, corpo := c.chamar("POST", "/v1/jobs",
+		`{"queue":"q","kind":"eco"}`)
 	jid := campo(t, corpo, "id")
 	resposta := make(chan int, 1)
 	go func() {
-		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet,
-			c.base+"/v1/jobs/"+jid+"?wait=30s", nil)
+		req, _ := http.NewRequestWithContext(t.Context(),
+			http.MethodGet, c.base+"/v1/jobs/"+jid+"?wait=30s", nil)
 		req.Header.Set("Authorization", "Bearer tk")
 		req.Header.Set("Enxame-Timeout", "40s")
 		resp, err := http.DefaultClient.Do(req)
