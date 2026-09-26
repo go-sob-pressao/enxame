@@ -81,6 +81,8 @@ func motor(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Cada chamada traz o próprio contexto, do stream.
+	//nolint:contextcheck
 	srv := grpc.NewServer(tgrpc.Servidor(token,
 		slog.New(slog.DiscardHandler))...)
 	enxamev1.RegisterWorkerServiceServer(srv, &tgrpc.Server{
