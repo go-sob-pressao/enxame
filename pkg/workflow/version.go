@@ -21,7 +21,11 @@ const DefaultVersion = 0
 // antigo. minimo acima de DefaultVersion declara que o código não sabe
 // mais continuar runs antigos: eles param com erro, em vez de seguir um
 // caminho que não existe mais.
-func Version(c *Context, mudanca string, minimo, maximo int) (int, error) {
+func Version(
+	c *Context,
+	mudanca string,
+	minimo, maximo int,
+) (int, error) {
 	r, gravado := c.hist.Lookup(c.seq + 1)
 	switch {
 	case gravado && r.Kind == KindVersion && r.Name == mudanca:
