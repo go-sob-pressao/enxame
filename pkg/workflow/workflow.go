@@ -66,6 +66,8 @@ func NewContext(
 // Context devolve o context.Context da execução, para cancelamento.
 func (c *Context) Context() context.Context { return c.ctx }
 
+// livro:inicio determinismo
+
 // próximo avança a posição e devolve o passo gravado nela, conferindo
 // que o código pede, nessa posição, o mesmo passo que pediu antes.
 func (c *Context) proximo(name string, k Kind) (Record, bool, error) {
@@ -86,6 +88,8 @@ func (c *Context) proximo(name string, k Kind) (Record, bool, error) {
 	}
 	return r, true, nil
 }
+
+// livro:fim determinismo
 
 // ErrSuspended indica que o workflow parou à espera de algo — o fim de
 // um Sleep. Não é falha: o runtime reexecuta o workflow mais tarde.
