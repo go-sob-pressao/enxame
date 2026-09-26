@@ -24,7 +24,7 @@ type Endpoint struct {
 }
 
 // NovoEndpoint sobe o receptor. responder decide o status de cada
-// requisição pelo número dela; um 429 vai com Retry-After: 2.
+// requisição pelo número dela; 429 e 503 vão com Retry-After: 2.
 func NovoEndpoint(
 	t testing.TB,
 	segredo string,
@@ -50,7 +50,8 @@ func NovoEndpoint(
 				return
 			}
 			status := e.responder(n)
-			if status == http.StatusTooManyRequests {
+			if status == http.StatusTooManyRequests ||
+				status == http.StatusServiceUnavailable {
 				w.Header().Set("Retry-After", "2") // segundos
 			}
 			w.WriteHeader(status)

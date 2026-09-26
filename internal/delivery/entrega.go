@@ -107,7 +107,8 @@ func (d *Entregador) Fanout(ctx context.Context, j job.Job) error {
 // pergunta ao breaker, pega uma vaga no bulkhead, assina, envia com
 // prazo, registra a tentativa — sempre, com ou sem resposta — e decide
 // pelo status. 410 desativa o endpoint; o resto que não é 2xx volta à
-// fila, com backoff.
+// fila, com backoff — ou depois do Retry-After, se o endpoint mandou
+// um maior.
 func (d *Entregador) Entregar(ctx context.Context, j job.Job) error {
 	var a argsEntrega
 	if err := json.Unmarshal(j.Args, &a); err != nil {
@@ -153,8 +154,9 @@ func (d *Entregador) Entregar(ctx context.Context, j job.Job) error {
 		motivo := "o endpoint respondeu 410 Gone"
 		return runner.Permanent(errors.Join(errors.New(motivo),
 			d.Store.DisableEndpoint(ctx, e.Namespace, e.ID, motivo)))
-	case resultado == webhook.Desacelere && depois > 0:
-		// O endpoint disse quando voltar: o pool não repete antes.
+	case depois > 0:
+		// O endpoint disse quando voltar — num 429, num 503 ou em
+		// qualquer outra recusa —: o pool não repete antes.
 		return &runner.RepetirEm{Depois: depois,
 			Err: fmt.Errorf("endpoint respondeu %d", status)}
 	}
