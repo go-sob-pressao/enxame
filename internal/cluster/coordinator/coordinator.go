@@ -1,6 +1,9 @@
 package coordinator
 
-import "context"
+import (
+	"context"
+	"slices"
+)
 
 // NodeID identifica um nó do cluster.
 type NodeID string
@@ -37,3 +40,64 @@ type Coordinator interface {
 }
 
 // livro:fim contrato
+
+// livro:inicio distribuir
+
+// Distribute calcula o mapa para os membros dados, mexendo no mínimo de
+// partições possível em relação ao mapa anterior: quem continua no
+// cluster mantém o que tinha até a sua cota; só as partições de quem
+// saiu e o excesso de quem passou da cota mudam de dono. É uma função
+// pura.
+func Distribute(membros []NodeID, anterior Assignment) Assignment {
+	membros = slices.Sorted(slices.Values(membros))
+	novo := Assignment{
+		Epoch:  anterior.Epoch + 1,
+		Owners: make([]NodeID, NumPartitions),
+	}
+	if len(membros) == 0 {
+		return novo
+	}
+	cota := map[NodeID]int{}
+	for i, m := range membros {
+		cota[m] = NumPartitions / len(membros)
+		if i < NumPartitions%len(membros) {
+			cota[m]++
+		}
+	}
+	var orfas []int
+	for p := range NumPartitions {
+		dono := NodeID("")
+		if len(anterior.Owners) == NumPartitions {
+			dono = anterior.Owners[p]
+		}
+		if cota[dono] > 0 {
+			novo.Owners[p] = dono
+			cota[dono]--
+			continue
+		}
+		orfas = append(orfas, p)
+	}
+	for _, p := range orfas {
+		for _, m := range membros {
+			if cota[m] > 0 {
+				novo.Owners[p] = m
+				cota[m]--
+				break
+			}
+		}
+	}
+	return novo
+}
+
+// livro:fim distribuir
+
+// Moved conta quantas partições mudaram de dono entre dois mapas.
+func Moved(a, b Assignment) int {
+	n := 0
+	for p := range min(len(a.Owners), len(b.Owners)) {
+		if a.Owners[p] != b.Owners[p] {
+			n++
+		}
+	}
+	return n
+}
