@@ -12,6 +12,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
+	nucleo "github.com/go-sob-pressao/enxame/internal/core/webhook"
 	"github.com/go-sob-pressao/enxame/internal/store"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	"github.com/go-sob-pressao/enxame/pkg/webhook"
@@ -203,4 +204,25 @@ func (c *Client) WorkflowResult(
 	run, _, err := c.store.LoadRun(ctx, runID)
 	return RunResult{State: string(run.State), Output: run.Output,
 		Err: run.Err}, err
+}
+
+// Endpoint é um destino de webhooks.
+type Endpoint struct {
+	URL        string
+	EventTypes []string // vazio: todos
+	SecretRef  string   // env:NOME — o segredo whsec_… fica no ambiente
+}
+
+// CreateEndpoint inscreve um endpoint no namespace do cliente.
+func (c *Client) CreateEndpoint(
+	ctx context.Context,
+	e Endpoint,
+) (string, error) {
+	n := nucleo.Endpoint{Namespace: c.namespace, URL: e.URL,
+		EventTypes: e.EventTypes, SecretRef: e.SecretRef}
+	if err := nucleo.Validar(n); err != nil {
+		return "", err
+	}
+	n, err := c.store.CreateEndpoint(ctx, n)
+	return n.ID, err
 }

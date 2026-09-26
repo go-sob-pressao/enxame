@@ -54,6 +54,10 @@ type WorkerConfig struct {
 	RescueAfter time.Duration  // 5 min: prazo de uma tentativa órfã
 	Name        string         // hostname-pid
 	Log         *slog.Logger
+	// O breaker da entrega de webhooks, por endpoint: quantas falhas
+	// seguidas o abrem (5) e por quanto tempo fica aberto (1 min).
+	BreakerLimiar int
+	BreakerPausa  time.Duration
 }
 
 // Worker executa jobs, avança workflows, dispara agendamentos e resgata
@@ -122,6 +126,12 @@ func (w *Worker) Run(ctx context.Context) error {
 		filas[q] = w.handlers
 	}
 	d := delivery.Novo(s)
+	if w.cfg.BreakerLimiar > 0 {
+		d.Breakers.Limiar = w.cfg.BreakerLimiar
+	}
+	if w.cfg.BreakerPausa > 0 {
+		d.Breakers.Pausa = w.cfg.BreakerPausa
+	}
 	filas[webhook.FanoutQueue] = map[string]runner.Handler{
 		webhook.FanoutKind: d.Fanout, webhook.DeliverKind: d.Entregar}
 	if len(w.workflows) > 0 {
