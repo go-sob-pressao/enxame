@@ -1,19 +1,24 @@
 package avalanche
 
-import "time"
+import (
+	"time"
 
-// livro:inicio missao-04
+	"github.com/go-sob-pressao/enxame/internal/core/policy"
+)
+
+// livro:inicio missao-04-gabarito
 
 // ProximaTentativa diz quando repetir a entrega que falhou na tentativa
-// n (1, 2, 3…), a partir de agora: backoff exponencial, dobrando a cada
-// falha, até 17 minutos. sorte devolve um número em [0, 1).
+// n (1, 2, 3…), a partir de agora: backoff exponencial até 10 minutos,
+// com jitter total — cada entrega sorteia a sua espera entre zero e o
+// teto, e as que falharam juntas deixam de voltar juntas.
 func ProximaTentativa(
 	n int,
 	agora time.Time,
-	sorte func() float64, //nolint:revive // o acaso da simulação
+	sorte func() float64,
 ) time.Time {
-	espera := time.Duration(1<<min(n, 10)) * time.Second
-	return agora.Add(espera)
+	r := policy.Retry{Base: time.Second, Max: 10 * time.Minute}
+	return agora.Add(r.Delay(n, sorte))
 }
 
-// livro:fim missao-04
+// livro:fim missao-04-gabarito
