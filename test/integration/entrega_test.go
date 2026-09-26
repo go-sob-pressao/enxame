@@ -108,9 +108,11 @@ func TestEntregaComFalhasPassageiras(t *testing.T) {
 	c.esperar(t, `SELECT count(*) FROM job
 		WHERE kind = 'webhook.deliver' AND state = 'completed'`, 1)
 	recebidas, validas, ids := c.endpoint.Contagem()
-	tentativas := contar(t, c.db, `SELECT count(*) FROM webhook_attempt`)
+	tentativas := contar(t, c.db,
+		`SELECT count(*) FROM webhook_attempt`)
 	t.Logf("requisições %d, válidas %d, webhook-id distintos %d, "+
-		"tentativas registradas %d", recebidas, validas, ids, tentativas)
+		"tentativas registradas %d", recebidas, validas, ids,
+		tentativas)
 	if recebidas != 4 || validas != 4 || ids != 1 || tentativas != 4 {
 		t.Fatal("contagem inesperada")
 	}
