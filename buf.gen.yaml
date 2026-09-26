@@ -1,3 +1,5 @@
+# Plugins locais, instalados com go install nas versões do Makefile
+# (make ferramentas): a geração não depende do registro remoto do buf.
 version: v2
 managed:
   enabled: true
@@ -5,10 +7,10 @@ managed:
     - file_option: go_package_prefix
       value: github.com/go-sob-pressao/enxame/internal/transport/grpc/gen
 plugins:
-  - remote: buf.build/protocolbuffers/go
+  - local: protoc-gen-go
     out: internal/transport/grpc/gen
     opt: paths=source_relative
-  - remote: buf.build/grpc/go
+  - local: protoc-gen-go-grpc
     out: internal/transport/grpc/gen
     opt: paths=source_relative
 inputs:

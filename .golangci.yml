@@ -42,6 +42,7 @@ linters:
     presets: [std-error-handling]
     paths:
       - tools/archcheck/testdata   # módulos com violações plantadas de propósito
+      - internal/transport/grpc/gen   # gerado pelo buf (make proto)
     rules:
       - path: _test\.go
         linters: [errcheck]

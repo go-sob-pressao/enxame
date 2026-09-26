@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package enxame.v1;
+
+import "google/protobuf/duration.proto";
+
+// livro:inicio worker-proto
+
+// WorkerService é o que o motor oferece aos workers remotos.
+service WorkerService {
+  // Fetch é o long-poll remoto: o worker abre o stream dizendo quem é,
+  // de que filas trabalha e quantos jobs aceita; o motor envia um job
+  // por crédito, e o worker devolve crédito a cada job que tira da fila.
+  rpc Fetch(stream FetchRequest) returns (stream FetchResponse);
+  // Heartbeat diz que a tentativa continua viva. FAILED_PRECONDITION:
+  // a tentativa não é mais deste worker.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  // Finish registra o fim da tentativa, com sucesso ou falha.
+  rpc Finish(FinishRequest) returns (FinishResponse);
+}
+
+message FetchRequest {
+  // Só na primeira mensagem do stream.
+  string worker = 1;
+  repeated string queues = 2;
+  // Quantos jobs a mais o worker aceita receber.
+  int32 credit = 3;
+}
+
+// livro:fim worker-proto
+
+message FetchResponse {
+  Job job = 1;
+}
+
+message Job {
+  string id = 1;
+  string namespace = 2;
+  string queue = 3;
+  string kind = 4;
+  bytes args = 5;
+  int32 attempt = 6;
+  int32 max_attempts = 7;
+}
+
+message HeartbeatRequest {
+  string job_id = 1;
+  int32 attempt = 2;
+}
+
+message HeartbeatResponse {}
+
+message FinishRequest {
+  string job_id = 1;
+  // A tentativa que terminou. Uma tentativa que não é mais a atual é
+  // recusada: ela não pode concluir o job de outra.
+  int32 attempt = 2;
+  // Vazio: sucesso.
+  string error = 3;
+  bool permanent = 4;
+  // Espera até a próxima tentativa, se houver.
+  google.protobuf.Duration retry_in = 5;
+}
+
+message FinishResponse {}
