@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"time"
 
@@ -11,11 +12,16 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
+	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
+	"github.com/go-sob-pressao/enxame/internal/delivery"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	tgrpc "github.com/go-sob-pressao/enxame/internal/transport/grpc"
 	enxamev1 "github.com/go-sob-pressao/enxame/internal/transport/grpc/gen/enxame/v1"
 	api "github.com/go-sob-pressao/enxame/internal/transport/http"
+	"github.com/go-sob-pressao/enxame/internal/worker"
+	"github.com/go-sob-pressao/enxame/internal/worker/runner"
+	"github.com/go-sob-pressao/enxame/pkg/webhook"
 )
 
 type config struct {
@@ -70,6 +76,7 @@ func servir(
 	})
 
 	g.Go(func() error { return motor(ctx, s, c.resgate) })
+	g.Go(func() error { return entregar(ctx, s, log) })
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
 		slog.String("grpc", lisGRPC.Addr().String()))
@@ -125,4 +132,28 @@ func motor(
 			return ctx.Err()
 		}
 	}
+}
+
+// entregar roda o pool da entrega de webhooks: uma fila própria, com
+// workers próprios — um bulkhead: a entrega lenta a um cliente não
+// ocupa os workers dos jobs.
+func entregar(
+	ctx context.Context,
+	s *postgres.Store,
+	log *slog.Logger,
+) error {
+	d := delivery.Novo(s)
+	retry := policy.Retry{Base: 30 * time.Second, Max: time.Hour}
+	p := &worker.Pool{Queue: postgres.NewFila(ctx, s),
+		QueueName: webhook.FanoutQueue, Concurrency: 16,
+		Handlers: map[string]runner.Handler{
+			webhook.FanoutKind:  d.Fanout,
+			webhook.DeliverKind: d.Entregar},
+		PollTimeout: 5 * time.Second, AttemptTimeout: 20 * time.Second,
+		Backoff: func(a int) time.Duration {
+			return retry.Delay(a, rand.Float64)
+		},
+		ReportEvery: time.Minute, Worker: "enxamed-entrega",
+		Now: time.Now, Log: log}
+	return p.Run(ctx)
 }

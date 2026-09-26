@@ -15,10 +15,12 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
+	"github.com/go-sob-pressao/enxame/internal/delivery"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	"github.com/go-sob-pressao/enxame/internal/worker"
 	"github.com/go-sob-pressao/enxame/internal/worker/runner"
 	wf "github.com/go-sob-pressao/enxame/internal/worker/workflow"
+	"github.com/go-sob-pressao/enxame/pkg/webhook"
 	"github.com/go-sob-pressao/enxame/pkg/workflow"
 )
 
@@ -119,6 +121,9 @@ func (w *Worker) Run(ctx context.Context) error {
 	for q := range w.cfg.Queues {
 		filas[q] = w.handlers
 	}
+	d := delivery.Novo(s)
+	filas[webhook.FanoutQueue] = map[string]runner.Handler{
+		webhook.FanoutKind: d.Fanout, webhook.DeliverKind: d.Entregar}
 	if len(w.workflows) > 0 {
 		r := &wf.Replayer{Store: s, Funcs: w.workflows, Now: time.Now}
 		filas[workflow.AdvanceQueue] = map[string]runner.Handler{

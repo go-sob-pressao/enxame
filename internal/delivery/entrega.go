@@ -51,6 +51,15 @@ type Entregador struct {
 	vagas map[string]chan struct{}
 }
 
+// Novo cria o entregador com os padrões do Enxame: breaker de 5 falhas
+// seguidas e um minuto de pausa, 4 entregas em curso por endpoint,
+// segredos do ambiente.
+func Novo(s Store) *Entregador {
+	b := &resilience.Breakers{Limiar: 5, Pausa: time.Minute}
+	return &Entregador{Store: s, Cliente: NovoCliente(), Breakers: b,
+		LimitePorEndpoint: 4, Segredo: SegredoDoAmbiente, Now: time.Now}
+}
+
 type argsEntrega struct {
 	MessageID  string `json:"message_id"`
 	EndpointID string `json:"endpoint_id"`
