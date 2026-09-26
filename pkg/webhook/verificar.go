@@ -48,7 +48,8 @@ func Verificar(
 		return "", ErrAntigo
 	}
 	esperada := nucleo.Assinar(chave, id, enviado, corpo)
-	for recebida := range strings.FieldsSeq(h.Get("webhook-signature")) {
+	assinaturas := h.Get("webhook-signature")
+	for recebida := range strings.FieldsSeq(assinaturas) {
 		if hmac.Equal([]byte(recebida), []byte(esperada)) {
 			return id, nil
 		}

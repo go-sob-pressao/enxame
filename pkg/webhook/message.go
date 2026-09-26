@@ -10,8 +10,10 @@ type Message struct {
 	IdempotencyKey string // opcional: a mesma chave não grava de novo
 }
 
-// Os nomes do job que distribui a mensagem aos endpoints.
+// Os jobs da entrega: o fan-out distribui a mensagem, criando um job
+// de entrega por endpoint inscrito. Os dois vão para a mesma fila.
 const (
 	FanoutKind  = "webhook.fanout"
+	DeliverKind = "webhook.deliver"
 	FanoutQueue = "webhook"
 )
