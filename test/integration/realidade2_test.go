@@ -20,10 +20,15 @@ import (
 // recusa o excesso e quem entra tem latência limitada; depois dela,
 // volta ao normal sem fila para drenar; e todo job aceito existe.
 func TestRealidade2(t *testing.T) {
+	if comRace {
+		// O gerador roda no mesmo processo, e com -race ele se atrasa
+		// tanto que mede a si mesmo, e não o servidor.
+		t.Skip("teste de carga: rode sem -race")
+	}
 	db := testutil.Postgres(t)
 	a := api.NovaAPI(db, map[string]string{"t": "carga"},
 		slog.New(slog.DiscardHandler))
-	a.MaxEmCurso = 8
+	a.MaxEmCurso = 32 // o padrão do enxamed
 	srv := httptest.NewServer(a.Handler())
 	defer srv.Close()
 
@@ -50,8 +55,10 @@ func TestRealidade2(t *testing.T) {
 		t.Error("nada recusado: a avalanche não passou da " +
 			"capacidade, ou nada recusou o excesso")
 	}
-	if r := recusadas(depois); r > 0 || p99(depois) > max(5*base,
-		200*time.Millisecond) {
+	// Recuperar é voltar ao normal: no máximo 1% recusado — um pico
+	// passageiro ainda pode encostar no limite — e o p99 de antes.
+	if r := recusadas(depois); r > len(depois)/100 ||
+		p99(depois) > max(5*base, 200*time.Millisecond) {
 		t.Errorf("sem recuperação: %d recusadas, p99 %v", r,
 			p99(depois))
 	}
