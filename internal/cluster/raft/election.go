@@ -9,7 +9,7 @@ func (n *Node) Tick() {
 		n.heartbeatElapsed++
 		if n.heartbeatElapsed >= n.cfg.HeartbeatTicks {
 			n.heartbeatElapsed = 0
-			n.broadcastHeartbeat()
+			n.broadcastAppend()
 		}
 		return
 	}
@@ -32,7 +32,12 @@ func (n *Node) campaign() {
 		return
 	}
 	for _, p := range n.others() {
-		n.send(Message{Type: MsgVote, To: p})
+		n.send(Message{
+			Type:      MsgVote,
+			To:        p,
+			LastIndex: n.lastIndex(),
+			LastTerm:  n.lastTerm(),
+		})
 	}
 }
 
@@ -59,7 +64,12 @@ func (n *Node) becomeCandidate() {
 func (n *Node) becomeLeader() {
 	n.state, n.leader = Leader, n.cfg.ID
 	n.heartbeatElapsed = 0
-	n.broadcastHeartbeat()
+	n.next, n.match = map[NodeID]Index{}, map[NodeID]Index{}
+	for _, p := range n.cfg.Peers {
+		n.next[p], n.match[p] = n.lastIndex()+1, 0
+	}
+	n.match[n.cfg.ID] = n.lastIndex()
+	n.broadcastAppend()
 }
 
 // livro:fim papeis
@@ -100,9 +110,3 @@ func (n *Node) handleVoteResp(m Message) {
 }
 
 // livro:fim votar
-
-func (n *Node) broadcastHeartbeat() {
-	for _, p := range n.others() {
-		n.send(Message{Type: MsgApp, To: p})
-	}
-}

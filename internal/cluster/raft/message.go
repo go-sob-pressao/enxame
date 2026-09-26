@@ -20,4 +20,21 @@ type Message struct {
 	Term Term
 
 	Granted bool // MsgVoteResp
+
+	// MsgVote: o fim do log do candidato.
+	LastIndex Index
+	LastTerm  Term
+
+	// MsgApp: a entrada que precede as novas, as novas e o commit do
+	// líder.
+	PrevIndex Index
+	PrevTerm  Term
+	Entries   []Entry
+	Commit    Index
+
+	// MsgAppResp: aceitou? até onde o log agora coincide com o do
+	// líder; se recusou, uma dica de onde tentar de novo.
+	Success bool
+	Match   Index
+	Hint    Index
 }

@@ -63,6 +63,13 @@ type Node struct {
 	heartbeatElapsed int
 	votes            map[NodeID]bool
 
+	// log[0] é uma sentinela: índice e termo do snapshot
+	log      []Entry
+	commit   Index
+	entregue Index // até onde as entradas comitadas já saíram em Ready
+	next     map[NodeID]Index
+	match    map[NodeID]Index
+
 	outbox []Message
 }
 
@@ -73,39 +80,49 @@ func New(cfg Config) *Node {
 	}
 	cfg.Peers = slices.Clone(cfg.Peers)
 	slices.Sort(cfg.Peers)
-	n := &Node{cfg: cfg}
+	n := &Node{cfg: cfg, log: []Entry{{}}}
 	n.becomeFollower(0, 0)
 	return n
 }
 
 // Status é um retrato do nó, para testes, métricas e o coordenador.
 type Status struct {
-	ID     NodeID
-	State  State
-	Term   Term
-	Leader NodeID
+	ID        NodeID
+	State     State
+	Term      Term
+	Leader    NodeID
+	Commit    Index
+	LastIndex Index
 }
 
 // Status devolve o estado corrente.
 func (n *Node) Status() Status {
 	return Status{
-		ID:     n.cfg.ID,
-		State:  n.state,
-		Term:   n.term,
-		Leader: n.leader,
+		ID:        n.cfg.ID,
+		State:     n.state,
+		Term:      n.term,
+		Leader:    n.leader,
+		Commit:    n.commit,
+		LastIndex: n.lastIndex(),
 	}
 }
 
 // Ready é o que o nó produziu desde a última chamada: mensagens para
-// entregar aos outros nós.
+// entregar aos outros nós e entradas comitadas para a aplicação
+// aplicar, em ordem.
 type Ready struct {
-	Messages []Message
+	Messages  []Message
+	Committed []Entry
 }
 
 // Ready entrega (e esquece) o que o nó produziu.
 func (n *Node) Ready() Ready {
 	r := Ready{Messages: n.outbox}
 	n.outbox = nil
+	if n.commit > n.entregue {
+		r.Committed = n.slice(n.entregue+1, n.commit+1)
+		n.entregue = n.commit
+	}
 	return r
 }
 

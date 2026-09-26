@@ -4,6 +4,7 @@
 package rafttest
 
 import (
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"slices"
@@ -20,6 +21,8 @@ type Cluster struct {
 	corte map[[2]raft.NodeID]bool
 
 	lideres    map[raft.Term]raft.NodeID
+	aplicados  map[raft.NodeID][]raft.Entry
+	porIndice  map[raft.Index]raft.Entry
 	violacoes  []string
 	Entregues  int // mensagens entregues
 	Descartes  int // mensagens descartadas por queda ou partição
@@ -43,10 +46,12 @@ func New(n int, seed uint64, o Opcoes) *Cluster {
 	}
 	rng := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15))
 	c := &Cluster{
-		nodes:   map[raft.NodeID]*raft.Node{},
-		fora:    map[raft.NodeID]bool{},
-		corte:   map[[2]raft.NodeID]bool{},
-		lideres: map[raft.Term]raft.NodeID{},
+		nodes:     map[raft.NodeID]*raft.Node{},
+		fora:      map[raft.NodeID]bool{},
+		corte:     map[[2]raft.NodeID]bool{},
+		lideres:   map[raft.Term]raft.NodeID{},
+		aplicados: map[raft.NodeID][]raft.Entry{},
+		porIndice: map[raft.Index]raft.Entry{},
 	}
 	for i := 1; i <= n; i++ {
 		c.ids = append(c.ids, raft.NodeID(i))
@@ -88,8 +93,56 @@ func (c *Cluster) Run(n int) {
 }
 
 func (c *Cluster) coletar(id raft.NodeID) {
-	c.fila = append(c.fila, c.nodes[id].Ready().Messages...)
+	r := c.nodes[id].Ready()
+	c.fila = append(c.fila, r.Messages...)
+	c.aplicar(id, r.Committed)
 	c.registrarLideres()
+}
+
+// aplicar registra as entradas comitadas de um nó e verifica a
+// segurança da máquina de estados: dois nós nunca aplicam entradas
+// diferentes no mesmo índice.
+func (c *Cluster) aplicar(id raft.NodeID, es []raft.Entry) {
+	for _, e := range es {
+		outra, ok := c.porIndice[e.Index]
+		difere := ok && (outra.Term != e.Term ||
+			string(outra.Data) != string(e.Data))
+		if difere {
+			c.violacoes = append(c.violacoes, fmt.Sprintf(
+				"índice %d aplicado com %q (termo %d) e %q (termo %d)",
+				e.Index, outra.Data, outra.Term, e.Data, e.Term))
+			continue
+		}
+		c.porIndice[e.Index] = e
+		c.aplicados[id] = append(c.aplicados[id], e)
+	}
+}
+
+// Aplicados devolve os comandos que o nó aplicou, em ordem, sem as
+// entradas vazias de liderança.
+func (c *Cluster) Aplicados(id raft.NodeID) [][]byte {
+	var out [][]byte
+	for _, e := range c.aplicados[id] {
+		if e.Data != nil {
+			out = append(out, e.Data)
+		}
+	}
+	return out
+}
+
+// ErrSemLider é devolvido por Propose quando não há líder.
+var ErrSemLider = errors.New("rafttest: nenhum líder")
+
+// Propose entrega o comando ao líder corrente.
+func (c *Cluster) Propose(data []byte) error {
+	l := c.Leader()
+	if l == 0 {
+		return ErrSemLider
+	}
+	_, err := c.nodes[l].Propose(data)
+	c.coletar(l)
+	c.entregar()
+	return err
 }
 
 func (c *Cluster) entregar() {

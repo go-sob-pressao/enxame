@@ -26,14 +26,8 @@ func (n *Node) Step(m Message) {
 	case MsgApp:
 		n.handleApp(m)
 	case MsgAppResp:
+		n.handleAppResp(m)
 	}
 }
 
 // livro:fim step
-
-// handleApp, na etapa de eleição, só reconhece o líder e reinicia o
-// timer: é o heartbeat.
-func (n *Node) handleApp(m Message) {
-	n.becomeFollower(m.Term, m.From)
-	n.send(Message{Type: MsgAppResp, To: m.From})
-}
