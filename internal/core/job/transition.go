@@ -103,6 +103,23 @@ func Heartbeat(j Job, at time.Time, attempt int) ([]Event, error) {
 
 // livro:fim heartbeat
 
+// livro:inicio da-tentativa
+
+// DaTentativa confere que o fim que chega é o da tentativa corrente.
+// Um worker que foi resgatado enquanto trabalhava — pausado, partido
+// da rede, dado por morto — volta com o número antigo, e o fim dele é
+// recusado: o job já pertence a outra tentativa. O número da tentativa
+// é o fencing token de cada job.
+func DaTentativa(j Job, tentativa int) error {
+	if j.Attempt != tentativa {
+		return fmt.Errorf("%w: fim da tentativa %d; a atual é %d",
+			ErrInvalidTransition, tentativa, j.Attempt)
+	}
+	return nil
+}
+
+// livro:fim da-tentativa
+
 // Complete registra que o handler devolveu nil.
 func Complete(j Job, at time.Time) ([]Event, error) {
 	if err := exigir(j, "concluir"); err != nil {

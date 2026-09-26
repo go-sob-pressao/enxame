@@ -125,11 +125,18 @@ func (m *Memory) Fetch(
 // livro:fim fetch
 
 // Complete registra o sucesso da tentativa.
-func (m *Memory) Complete(jid id.JobID, at time.Time) error {
+func (m *Memory) Complete(
+	jid id.JobID,
+	tentativa int,
+	at time.Time,
+) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	j, err := m.buscar(jid)
 	if err != nil {
+		return err
+	}
+	if err := job.DaTentativa(j, tentativa); err != nil {
 		return err
 	}
 	evs, err := job.Complete(j, at)
@@ -143,6 +150,7 @@ func (m *Memory) Complete(jid id.JobID, at time.Time) error {
 // Fail registra a falha da tentativa.
 func (m *Memory) Fail(
 	jid id.JobID,
+	tentativa int,
 	at time.Time,
 	cause string,
 	permanent bool,
@@ -152,6 +160,9 @@ func (m *Memory) Fail(
 	defer m.mu.Unlock()
 	j, err := m.buscar(jid)
 	if err != nil {
+		return err
+	}
+	if err := job.DaTentativa(j, tentativa); err != nil {
 		return err
 	}
 	evs, err := job.Fail(j, at, cause, permanent, retryAt)

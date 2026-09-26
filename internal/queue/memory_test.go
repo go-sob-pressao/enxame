@@ -55,7 +55,8 @@ func TestRetryVoltaDepoisDoBackoff(t *testing.T) {
 		t.Fatal(err)
 	}
 	j, _, _ := m.Fetch("q", t0, "w")
-	if err := m.Fail(j.ID, t0, "falhou", false, t0.Add(time.Minute)); err != nil {
+	if err := m.Fail(j.ID, j.Attempt, t0, "falhou", false,
+		t0.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if n, _ := m.Promote(t0.Add(30 * time.Second)); n != 0 {

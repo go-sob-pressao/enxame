@@ -47,18 +47,32 @@ func (f *Fila) Changed() <-chan struct{} {
 	return c
 }
 
-// Complete registra o sucesso da tentativa.
-func (f *Fila) Complete(jid id.JobID, at time.Time) error {
+// livro:inicio fila-tentativa
+
+// Complete registra o sucesso da tentativa — se ela ainda for a
+// corrente. Até o Capítulo 23, este caminho não conferia o número, e
+// uma tentativa resgatada viva concluía o job em nome da substituta.
+func (f *Fila) Complete(
+	jid id.JobID,
+	tentativa int,
+	at time.Time,
+) error {
 	_, err := f.store.Decide(f.ctx, jid,
 		func(j job.Job) ([]job.Event, error) {
+			if err := job.DaTentativa(j, tentativa); err != nil {
+				return nil, err
+			}
 			return job.Complete(j, at)
 		})
 	return err
 }
 
+// livro:fim fila-tentativa
+
 // Fail registra a falha da tentativa.
 func (f *Fila) Fail(
 	jid id.JobID,
+	tentativa int,
 	at time.Time,
 	cause string,
 	permanent bool,
@@ -66,6 +80,9 @@ func (f *Fila) Fail(
 ) error {
 	_, err := f.store.Decide(f.ctx, jid,
 		func(j job.Job) ([]job.Event, error) {
+			if err := job.DaTentativa(j, tentativa); err != nil {
+				return nil, err
+			}
 			return job.Fail(j, at, cause, permanent, retryAt)
 		})
 	return err

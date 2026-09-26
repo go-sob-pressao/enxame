@@ -158,10 +158,9 @@ func (s *Server) Finish(
 	agora := s.Now()
 	_, err = s.Motor.Decide(ctx, jid,
 		func(j job.Job) ([]job.Event, error) {
-			if j.Attempt != int(req.GetAttempt()) {
-				return nil, fmt.Errorf("%w: fim da tentativa %d; a "+
-					"atual é %d", job.ErrInvalidTransition,
-					req.GetAttempt(), j.Attempt)
+			err := job.DaTentativa(j, int(req.GetAttempt()))
+			if err != nil {
+				return nil, err
 			}
 			if req.GetError() == "" {
 				return job.Complete(j, agora)

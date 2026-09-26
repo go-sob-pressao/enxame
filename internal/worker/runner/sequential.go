@@ -23,9 +23,10 @@ type Queue interface {
 		at time.Time,
 		worker string,
 	) (job.Job, bool, error)
-	Complete(jid id.JobID, at time.Time) error
+	Complete(jid id.JobID, tentativa int, at time.Time) error
 	Fail(
 		jid id.JobID,
+		tentativa int,
 		at time.Time,
 		cause string,
 		permanent bool,

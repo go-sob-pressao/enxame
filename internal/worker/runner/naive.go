@@ -76,6 +76,7 @@ func executar(
 	if !ok {
 		return q.Fail(
 			j.ID,
+			j.Attempt,
 			agora(),
 			"kind sem handler: "+j.Kind,
 			true,
@@ -86,11 +87,12 @@ func executar(
 		t := agora()
 		return q.Fail(
 			j.ID,
+			j.Attempt,
 			t,
 			err.Error(),
 			isPermanent(err),
 			t.Add(retry),
 		)
 	}
-	return q.Complete(j.ID, agora())
+	return q.Complete(j.ID, j.Attempt, agora())
 }

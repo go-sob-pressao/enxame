@@ -21,9 +21,10 @@ import (
 type Queue interface {
 	queue.Source
 	queue.Notifier
-	Complete(jid id.JobID, at time.Time) error
+	Complete(jid id.JobID, tentativa int, at time.Time) error
 	Fail(
 		jid id.JobID,
+		tentativa int,
 		at time.Time,
 		cause string,
 		permanent bool,
@@ -165,6 +166,7 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	if !ok {
 		return p.Queue.Fail(
 			j.ID,
+			j.Attempt,
 			p.Now(),
 			"kind sem handler: "+j.Kind,
 			true,
@@ -214,13 +216,14 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 		agora := p.Now()
 		return p.registrar(j, p.Queue.Fail(
 			j.ID,
+			j.Attempt,
 			agora,
 			err.Error(),
 			errors.Is(err, runner.ErrPermanent),
 			agora.Add(p.espera(j.Attempt, err)),
 		))
 	}
-	return p.registrar(j, p.Queue.Complete(j.ID, p.Now()))
+	return p.registrar(j, p.Queue.Complete(j.ID, j.Attempt, p.Now()))
 }
 
 // livro:inicio perdida

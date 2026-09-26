@@ -22,14 +22,13 @@ import (
 // interface da fila em memória e da fila no Postgres, agora sobre um
 // stream gRPC. O pool da Parte I não sabe a diferença.
 type Remoto struct {
-	ctx      context.Context
-	cliente  enxamev1.WorkerServiceClient
-	stream   enxamev1.WorkerService_FetchClient
-	jobs     chan job.Job
-	mu       sync.Mutex
-	aviso    chan struct{}
-	tentativ map[id.JobID]int
-	falha    error
+	ctx     context.Context
+	cliente enxamev1.WorkerServiceClient
+	stream  enxamev1.WorkerService_FetchClient
+	jobs    chan job.Job
+	mu      sync.Mutex
+	aviso   chan struct{}
+	falha   error
 }
 
 // Conectar abre o stream de busca. capacidade é quantos jobs o worker
@@ -53,9 +52,8 @@ func Conectar(
 		return nil, err
 	}
 	r := &Remoto{ctx: ctx, cliente: c, stream: stream,
-		jobs:     make(chan job.Job, capacidade),
-		aviso:    make(chan struct{}),
-		tentativ: map[id.JobID]int{}}
+		jobs:  make(chan job.Job, capacidade),
+		aviso: make(chan struct{})}
 	go r.receber()
 	return r, nil
 }
@@ -75,9 +73,6 @@ func (r *Remoto) receber() {
 		if err != nil {
 			continue
 		}
-		r.mu.Lock()
-		r.tentativ[j.ID] = j.Attempt
-		r.mu.Unlock()
 		r.jobs <- j
 		r.mu.Lock()
 		close(r.aviso)
@@ -112,31 +107,34 @@ func (r *Remoto) Changed() <-chan struct{} {
 }
 
 // Complete registra o sucesso da tentativa.
-func (r *Remoto) Complete(jid id.JobID, _ time.Time) error {
-	return r.terminar(jid, &enxamev1.FinishRequest{})
+func (r *Remoto) Complete(
+	jid id.JobID,
+	tentativa int,
+	_ time.Time,
+) error {
+	return r.terminar(jid, tentativa, &enxamev1.FinishRequest{})
 }
 
 // Fail registra a falha da tentativa.
 func (r *Remoto) Fail(
 	jid id.JobID,
+	tentativa int,
 	at time.Time,
 	cause string,
 	permanent bool,
 	retryAt time.Time,
 ) error {
-	return r.terminar(jid, &enxamev1.FinishRequest{Error: cause,
+	return r.terminar(jid, tentativa, &enxamev1.FinishRequest{
+		Error:     cause,
 		Permanent: permanent,
 		RetryIn:   durationpb.New(retryAt.Sub(at))})
 }
 
 func (r *Remoto) terminar(
 	jid id.JobID,
+	tentativa int,
 	req *enxamev1.FinishRequest,
 ) error {
-	r.mu.Lock()
-	tentativa := r.tentativ[jid]
-	delete(r.tentativ, jid)
-	r.mu.Unlock()
 	req.JobId = jid.String()
 	req.Attempt = int32(tentativa) //nolint:gosec // cabe
 	return repetir(r.ctx, func() error {
