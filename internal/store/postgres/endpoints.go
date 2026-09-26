@@ -77,7 +77,7 @@ func (s *Store) DisableEndpoint(
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("%w: endpoint %s inexistente ou já desativado",
+		return fmt.Errorf("%w: endpoint %s, ou já desativado",
 			store.ErrNotFound, id)
 	}
 	return nil

@@ -7,7 +7,8 @@
 //	enxamectl workflow start --type pedido --id pedido-42 \
 //	    --input @pedido.json
 //	enxamectl workflow describe --run 0199…
-//	enxamectl webhook endpoint add --url https://cliente.exemplo/hooks \
+//	enxamectl webhook endpoint add \
+//	    --url https://cliente.exemplo/hooks \
 //	    --events pedido.pago --secret-ref env:SEGREDO
 //	enxamectl webhook endpoint list
 //	enxamectl webhook endpoint remove --id 0199…
