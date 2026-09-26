@@ -40,6 +40,7 @@ type History interface {
 // Sleep, SideEffect ou Now ocupa a próxima posição do histórico.
 type Context struct {
 	ctx     context.Context
+	runID   string
 	hist    History
 	seq     int
 	clock   func() time.Time
@@ -53,11 +54,13 @@ type Context struct {
 // job daquela posição a executará.
 func NewContext(
 	ctx context.Context,
+	runID string,
 	h History,
 	clock func() time.Time,
 	posicao int,
 ) *Context {
-	return &Context{ctx: ctx, hist: h, clock: clock, posicao: posicao}
+	return &Context{ctx: ctx, runID: runID, hist: h, clock: clock,
+		posicao: posicao}
 }
 
 // Context devolve o context.Context da execução, para cancelamento.

@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
+	"github.com/go-sob-pressao/enxame/internal/core/id"
+	"github.com/go-sob-pressao/enxame/pkg/job"
 )
 
 // Permanent marca o erro de um passo como definitivo: ele é gravado, e
@@ -40,7 +43,10 @@ func Step[T any](
 		err := json.Unmarshal(r.Output, &v)
 		return v, err
 	}
-	v, err := fn(c.ctx)
+	// Dentro do passo, job.IdempotencyKey devolve a chave da posição:
+	// a mesma em todos os replays que chegarem a executá-la.
+	v, err := fn(job.WithInfo(c.ctx, job.Info{
+		Kind: name, IdempotencyKey: id.StepKey(c.runID, r.Seq)}))
 	var p permanente
 	switch {
 	case errors.As(err, &p):

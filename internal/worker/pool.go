@@ -13,6 +13,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/queue"
 	"github.com/go-sob-pressao/enxame/internal/worker/runner"
+	pkgjob "github.com/go-sob-pressao/enxame/pkg/job"
 )
 
 // Queue é o que o pool precisa da fila, declarado aqui, no consumidor.
@@ -39,10 +40,13 @@ type Pool struct {
 	PollTimeout    time.Duration
 	AttemptTimeout time.Duration
 	RetryDelay     time.Duration
-	ReportEvery    time.Duration
-	Worker         string
-	Now            func() time.Time
-	Log            *slog.Logger
+	// Backoff, se definido, substitui RetryDelay: recebe o número da
+	// tentativa que falhou e devolve a espera até a próxima.
+	Backoff     func(attempt int) time.Duration
+	ReportEvery time.Duration
+	Worker      string
+	Now         func() time.Time
+	Log         *slog.Logger
 
 	executados, falhas, panicos atomic.Int64
 	rodando                     atomic.Bool
@@ -168,6 +172,11 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 		ErrAttemptTimeout,
 	)
 	defer cancelar()
+	tentativa = pkgjob.WithInfo(tentativa, pkgjob.Info{
+		ID: j.ID.String(), Kind: j.Kind, Attempt: j.Attempt,
+		MaxAttempts:    j.MaxAttempts,
+		IdempotencyKey: id.JobKey(j.Namespace, j.ID),
+	})
 	resultado := make(chan error, 1)
 	go func() {
 		resultado <- runner.Call(tentativa, h, j)
@@ -191,7 +200,7 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 			agora,
 			err.Error(),
 			errors.Is(err, runner.ErrPermanent),
-			agora.Add(p.RetryDelay),
+			agora.Add(p.espera(j.Attempt)),
 		)
 	}
 	return p.Queue.Complete(j.ID, p.Now())
@@ -217,3 +226,11 @@ func (p *Pool) relatar(ctx context.Context) error {
 }
 
 // livro:fim pool-m1-corrigido
+
+// espera devolve quanto esperar antes da próxima tentativa.
+func (p *Pool) espera(attempt int) time.Duration {
+	if p.Backoff != nil {
+		return p.Backoff(attempt)
+	}
+	return p.RetryDelay
+}

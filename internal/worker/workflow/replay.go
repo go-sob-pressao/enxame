@@ -92,7 +92,7 @@ func (r *Replayer) avancar(
 	}
 	h := &historico{store: r.Store, runID: runID, passos: passos,
 		continuar: posicao > 0, agora: r.Now}
-	c := workflow.NewContext(ctx, h, r.Now, posicao)
+	c := workflow.NewContext(ctx, runID, h, r.Now, posicao)
 	saida, err := fn(c, run.Input)
 
 	var suspenso *workflow.SuspendedError
