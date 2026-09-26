@@ -108,7 +108,7 @@ func (p *Phi) Valor(agora time.Time) float64 {
 	if depois < 1e-300 {
 		return 300 // o limite do float64: certeza, na prática
 	}
-	return -math.Log10(depois)
+	return max(-math.Log10(depois), 0) // sem o −0 de log10(1)
 }
 
 // Estado traduz phi nos três estados.
