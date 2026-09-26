@@ -8,13 +8,14 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/store"
 )
 
 // UpsertSchedule cria ou substitui um agendamento.
 func (s *Store) UpsertSchedule(
 	ctx context.Context,
-	sc store.Schedule,
+	sc schedule.Schedule,
 ) error {
 	_, err := s.pool.Exec(ctx, `INSERT INTO schedule (namespace,
 		schedule_id, cron_expr, timezone, queue, kind, args,
@@ -37,7 +38,7 @@ func (s *Store) UpsertSchedule(
 func (s *Store) FireDue(
 	ctx context.Context,
 	now time.Time,
-	decidir func(store.Schedule, time.Time) (
+	decidir func(schedule.Schedule, time.Time) (
 		job.Spec, time.Time, error),
 ) (disparados, absorvidos int, err error) {
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -81,7 +82,7 @@ func vencidos(
 	ctx context.Context,
 	tx pgx.Tx,
 	now time.Time,
-) ([]store.Schedule, error) {
+) ([]schedule.Schedule, error) {
 	rows, err := tx.Query(ctx, `SELECT namespace, schedule_id,
 		cron_expr, timezone, queue, kind, args::text, next_fire_at
 		FROM schedule WHERE NOT paused AND next_fire_at <= $1
@@ -90,8 +91,8 @@ func vencidos(
 		return nil, err
 	}
 	return pgx.CollectRows(rows,
-		func(r pgx.CollectableRow) (store.Schedule, error) {
-			var sc store.Schedule
+		func(r pgx.CollectableRow) (schedule.Schedule, error) {
+			var sc schedule.Schedule
 			var a string
 			err := r.Scan(&sc.Namespace, &sc.ID, &sc.Expr, &sc.Timezone,
 				&sc.Queue, &sc.Kind, &a, &sc.NextFire)

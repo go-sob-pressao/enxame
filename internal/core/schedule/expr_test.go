@@ -1,10 +1,10 @@
-package cron_test
+package schedule_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/go-sob-pressao/enxame/internal/engine/cron"
+	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 )
 
 func TestNext(t *testing.T) {
@@ -29,7 +29,7 @@ func TestNext(t *testing.T) {
 		{"0 0 13 * 5", time.UTC, "2026-10-02T00:00:00Z"},
 	}
 	for _, c := range casos {
-		e, err := cron.Parse(c.expr)
+		e, err := schedule.Parse(c.expr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +40,7 @@ func TestNext(t *testing.T) {
 	}
 	for _, ruim := range []string{"* * * *", "61 * * * *", "*/0 * * * *",
 		"5-1 * * * *", "a * * * *"} {
-		if _, err := cron.Parse(ruim); err == nil {
+		if _, err := schedule.Parse(ruim); err == nil {
 			t.Errorf("%q aceita", ruim)
 		}
 	}

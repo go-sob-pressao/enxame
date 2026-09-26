@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/engine/cron"
-	"github.com/go-sob-pressao/enxame/internal/store"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	"github.com/go-sob-pressao/enxame/test/testutil"
 )
@@ -17,7 +17,7 @@ var _ cron.Store = (*postgres.Store)(nil)
 
 func agendamento(t *testing.T, s *postgres.Store, prox time.Time) {
 	t.Helper()
-	if err := s.UpsertSchedule(t.Context(), store.Schedule{
+	if err := s.UpsertSchedule(t.Context(), schedule.Schedule{
 		Namespace: "loja", ID: "fechamento", Expr: "*/5 * * * *",
 		Timezone: "UTC", Queue: "q", Kind: "fechar-caixa",
 		NextFire: prox,
@@ -38,12 +38,12 @@ func TestCronUmaVezPorJanela(t *testing.T) {
 	dez := time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC)
 	agendamento(t, s, dez)
 	agora := dez.Add(30 * time.Second)
-	d, a, err := s.FireDue(t.Context(), agora, cron.Disparo)
+	d, a, err := s.FireDue(t.Context(), agora, schedule.Disparo)
 	if err != nil || d != 1 || a != 0 {
 		t.Fatalf("primeiro disparo: %d, %d, %v", d, a, err)
 	}
 	agendamento(t, s, dez) // a mesma janela, de novo
-	d, a, err = s.FireDue(t.Context(), agora, cron.Disparo)
+	d, a, err = s.FireDue(t.Context(), agora, schedule.Disparo)
 	if err != nil || d != 0 || a != 1 {
 		t.Fatalf("segundo disparo: %d, %d, %v", d, a, err)
 	}
@@ -72,7 +72,7 @@ func TestCronDoisAgendadores(t *testing.T) {
 	for range 2 {
 		wg.Go(func() {
 			if _, _, err := s.FireDue(t.Context(),
-				dez.Add(time.Second), cron.Disparo); err != nil {
+				dez.Add(time.Second), schedule.Disparo); err != nil {
 				t.Error(err)
 			}
 		})
