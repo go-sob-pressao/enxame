@@ -30,9 +30,10 @@ const (
 //
 // WorkerService é o que o motor oferece aos workers remotos.
 type WorkerServiceClient interface {
-	// Fetch é o long-poll remoto: o worker abre o stream dizendo quem é,
-	// de que filas trabalha e quantos jobs aceita; o motor envia um job
-	// por crédito, e o worker devolve crédito a cada job que tira da fila.
+	// Fetch é o long-poll remoto: o worker abre o stream dizendo quem
+	// é, de que filas trabalha e quantos jobs aceita; o motor envia um
+	// job por crédito, e o worker devolve crédito a cada job que tira
+	// da fila.
 	Fetch(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FetchRequest, FetchResponse], error)
 	// Heartbeat diz que a tentativa continua viva. FAILED_PRECONDITION:
 	// a tentativa não é mais deste worker.
@@ -88,9 +89,10 @@ func (c *workerServiceClient) Finish(ctx context.Context, in *FinishRequest, opt
 //
 // WorkerService é o que o motor oferece aos workers remotos.
 type WorkerServiceServer interface {
-	// Fetch é o long-poll remoto: o worker abre o stream dizendo quem é,
-	// de que filas trabalha e quantos jobs aceita; o motor envia um job
-	// por crédito, e o worker devolve crédito a cada job que tira da fila.
+	// Fetch é o long-poll remoto: o worker abre o stream dizendo quem
+	// é, de que filas trabalha e quantos jobs aceita; o motor envia um
+	// job por crédito, e o worker devolve crédito a cada job que tira
+	// da fila.
 	Fetch(grpc.BidiStreamingServer[FetchRequest, FetchResponse]) error
 	// Heartbeat diz que a tentativa continua viva. FAILED_PRECONDITION:
 	// a tentativa não é mais deste worker.

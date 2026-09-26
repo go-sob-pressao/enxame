@@ -8,9 +8,10 @@ import "google/protobuf/duration.proto";
 
 // WorkerService é o que o motor oferece aos workers remotos.
 service WorkerService {
-  // Fetch é o long-poll remoto: o worker abre o stream dizendo quem é,
-  // de que filas trabalha e quantos jobs aceita; o motor envia um job
-  // por crédito, e o worker devolve crédito a cada job que tira da fila.
+  // Fetch é o long-poll remoto: o worker abre o stream dizendo quem
+  // é, de que filas trabalha e quantos jobs aceita; o motor envia um
+  // job por crédito, e o worker devolve crédito a cada job que tira
+  // da fila.
   rpc Fetch(stream FetchRequest) returns (stream FetchResponse);
   // Heartbeat diz que a tentativa continua viva. FAILED_PRECONDITION:
   // a tentativa não é mais deste worker.
