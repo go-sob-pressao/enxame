@@ -18,7 +18,8 @@ func TestDualWritePerdeCobranca(t *testing.T) {
 		Falha: func() error { return errQueda }}
 	_ = s.CriarDualWrite(t.Context(), 1)
 	if n := pedidos(t, db); n != len(fila.cobrados) {
-		t.Fatalf("%d pedido gravado, %d cobrança", n, len(fila.cobrados))
+		t.Fatalf("%d pedido gravado, %d cobrança", n,
+			len(fila.cobrados))
 	}
 }
 

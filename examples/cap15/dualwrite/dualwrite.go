@@ -1,5 +1,5 @@
-// Package dualwrite: gravar o pedido no banco e avisar a cobrança por
-// uma fila — três formas de fazer, duas delas erradas.
+// Package dualwrite mostra como gravar o pedido no banco e avisar a
+// cobrança por uma fila — três formas de fazer, duas delas erradas.
 package dualwrite
 
 import (

@@ -34,18 +34,21 @@ func preparar(b *testing.B) (*pgxpool.Pool, *enxame.Client) {
 // BenchmarkUmaTransacao: o pedido e o job no mesmo COMMIT.
 func BenchmarkUmaTransacao(b *testing.B) {
 	db, c := preparar(b)
+	ctx := b.Context()
+	criar := func(id int64) func(pgx.Tx) error {
+		return func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx,
+				`INSERT INTO pedido VALUES ($1, 100)`, id)
+			if err == nil {
+				_, err = c.InsertTx(ctx, tx, cobrar{id})
+			}
+			return err
+		}
+	}
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			id := proximo.Add(1)
-			err := pgx.BeginFunc(b.Context(), db, func(tx pgx.Tx) error {
-				_, err := tx.Exec(b.Context(),
-					`INSERT INTO pedido VALUES ($1, 100)`, id)
-				if err == nil {
-					_, err = c.InsertTx(b.Context(), tx, cobrar{id})
-				}
-				return err
-			})
-			if err != nil {
+			if err := pgx.BeginFunc(ctx, db, criar(id)); err != nil {
 				b.Fatal(err)
 			}
 		}

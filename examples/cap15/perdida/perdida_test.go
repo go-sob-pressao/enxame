@@ -22,7 +22,11 @@ func banco(t *testing.T) *pgxpool.Pool {
 	return db
 }
 
-func iniciar(t *testing.T, db *pgxpool.Pool, nivel pgx.TxIsoLevel) pgx.Tx {
+func iniciar(
+	t *testing.T,
+	db *pgxpool.Pool,
+	nivel pgx.TxIsoLevel,
+) pgx.Tx {
 	t.Helper()
 	tx, err := db.BeginTx(t.Context(), pgx.TxOptions{IsoLevel: nivel})
 	if err != nil {
@@ -34,8 +38,10 @@ func iniciar(t *testing.T, db *pgxpool.Pool, nivel pgx.TxIsoLevel) pgx.Tx {
 
 func ler(t *testing.T, tx pgx.Tx) (saldo int, versao int64) {
 	t.Helper()
-	err := tx.QueryRow(t.Context(),
-		`SELECT saldo, version FROM conta WHERE id = 1`).Scan(&saldo, &versao)
+	err := tx.QueryRow(
+		t.Context(),
+		`SELECT saldo, version FROM conta WHERE id = 1`,
+	).Scan(&saldo, &versao)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,8 +110,8 @@ func TestSomaNoBanco(t *testing.T) {
 	}
 }
 
-// Em REPEATABLE READ, o UPDATE de t2 sobre uma linha que t1 mudou depois
-// do início de t2 falha com erro de serialização (40001).
+// Em REPEATABLE READ, o UPDATE de t2 sobre uma linha que t1 mudou
+// depois do início de t2 falha com erro de serialização (40001).
 func TestRepeatableReadRecusa(t *testing.T) {
 	db := banco(t)
 	ctx := t.Context()

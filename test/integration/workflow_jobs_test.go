@@ -54,9 +54,14 @@ func TestWorkflowAvancaPorJobs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	p := &worker.Pool{
-		Queue: postgres.NewFila(ctx, s), QueueName: workflow.AdvanceQueue,
+		Queue: postgres.NewFila(
+			ctx,
+			s,
+		), QueueName: workflow.AdvanceQueue,
 		Concurrency: 2,
-		Handlers:    map[string]runner.Handler{workflow.AdvanceKind: r.Handler()},
+		Handlers: map[string]runner.Handler{
+			workflow.AdvanceKind: r.Handler(),
+		},
 		PollTimeout: time.Second, AttemptTimeout: 10 * time.Second,
 		RetryDelay: time.Millisecond, ReportEvery: time.Hour,
 		Worker: "w1", Now: time.Now, Log: slog.New(slog.DiscardHandler),
@@ -75,10 +80,13 @@ func TestWorkflowAvancaPorJobs(t *testing.T) {
 			break
 		}
 		if time.Now().After(limite) {
-			rows, _ := db.Query(t.Context(), `SELECT kind, state, args::text,
+			rows, _ := db.Query(
+				t.Context(),
+				`SELECT kind, state, args::text,
 				coalesce((SELECT string_agg(e.payload::text, ' | ')
 				  FROM job_event e WHERE e.job_id = job.job_id), '')
-				FROM job ORDER BY created_at`)
+				FROM job ORDER BY created_at`,
+			)
 			for rows.Next() {
 				var k, st, a, ev string
 				_ = rows.Scan(&k, &st, &a, &ev)
@@ -89,7 +97,11 @@ func TestWorkflowAvancaPorJobs(t *testing.T) {
 		<-time.After(50 * time.Millisecond)
 	}
 	if cobrancas.Load() != 1 || notas.Load() != 1 {
-		t.Fatalf("cobranças %d, notas %d", cobrancas.Load(), notas.Load())
+		t.Fatalf(
+			"cobranças %d, notas %d",
+			cobrancas.Load(),
+			notas.Load(),
+		)
 	}
 	var jobs int
 	if err := db.QueryRow(t.Context(), `SELECT count(*) FROM job

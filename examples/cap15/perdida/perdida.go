@@ -1,5 +1,5 @@
-// Package perdida: a atualização perdida em READ COMMITTED, e as três
-// formas de evitá-la no PostgreSQL.
+// Package perdida mostra a atualização perdida em READ COMMITTED, e as
+// três formas de evitá-la no PostgreSQL.
 package perdida
 
 // Esquema cria a conta do exemplo, com saldo 100.
