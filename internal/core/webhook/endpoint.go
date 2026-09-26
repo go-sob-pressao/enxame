@@ -18,6 +18,7 @@ type Endpoint struct {
 	Description string
 	EventTypes  []string // vazio: todos os tipos
 	SecretRef   string   // referência ao segredo; nunca o segredo
+	RateLimit   int      // entregas por segundo; zero: sem limite
 	Disabled    bool
 	CreatedAt   time.Time
 }
@@ -34,6 +35,8 @@ func Validar(e Endpoint) error {
 			esquema)
 	case e.SecretRef == "":
 		return fmt.Errorf("%w: secret_ref é obrigatório", ErrInvalido)
+	case e.RateLimit < 0:
+		return fmt.Errorf("%w: rate_limit negativo", ErrInvalido)
 	}
 	for _, t := range e.EventTypes {
 		if strings.TrimSpace(t) == "" {

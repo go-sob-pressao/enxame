@@ -22,6 +22,9 @@
           "id": {
             "type": "string"
           },
+          "rate_limit": {
+            "type": "integer"
+          },
           "secret_ref": {
             "type": "string"
           },
@@ -35,6 +38,7 @@
           "description",
           "event_types",
           "secret_ref",
+          "rate_limit",
           "disabled",
           "created_at"
         ],
@@ -124,6 +128,9 @@
                 "id": {
                   "type": "string"
                 },
+                "rate_limit": {
+                  "type": "integer"
+                },
                 "secret_ref": {
                   "type": "string"
                 },
@@ -137,6 +144,7 @@
                 "description",
                 "event_types",
                 "secret_ref",
+                "rate_limit",
                 "disabled",
                 "created_at"
               ],
@@ -160,6 +168,9 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "rate_limit": {
+            "type": "integer"
           },
           "secret_ref": {
             "type": "string"

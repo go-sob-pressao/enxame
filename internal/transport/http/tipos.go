@@ -50,6 +50,7 @@ type NovoEndpoint struct {
 	Description string   `json:"description,omitzero"`
 	EventTypes  []string `json:"event_types"`
 	SecretRef   string   `json:"secret_ref"`
+	RateLimit   int      `json:"rate_limit,omitzero"`
 }
 
 // Endpoint é o endpoint como a API o mostra.
@@ -59,6 +60,7 @@ type Endpoint struct {
 	Description string    `json:"description"`
 	EventTypes  []string  `json:"event_types"`
 	SecretRef   string    `json:"secret_ref"`
+	RateLimit   int       `json:"rate_limit"`
 	Disabled    bool      `json:"disabled"`
 	CreatedAt   time.Time `json:"created_at"`
 }

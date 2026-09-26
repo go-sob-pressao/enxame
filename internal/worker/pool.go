@@ -217,7 +217,7 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 			agora,
 			err.Error(),
 			errors.Is(err, runner.ErrPermanent),
-			agora.Add(p.espera(j.Attempt)),
+			agora.Add(p.espera(j.Attempt, err)),
 		))
 	}
 	return p.registrar(j, p.Queue.Complete(j.ID, p.Now()))
@@ -266,10 +266,15 @@ func (p *Pool) relatar(ctx context.Context) error {
 
 // livro:fim pool-m1-corrigido
 
-// espera devolve quanto esperar antes da próxima tentativa.
-func (p *Pool) espera(attempt int) time.Duration {
+// espera devolve quanto esperar antes da próxima tentativa: o backoff,
+// ou o que o handler pediu com RepetirEm, o que for maior.
+func (p *Pool) espera(attempt int, err error) time.Duration {
+	d := p.RetryDelay
 	if p.Backoff != nil {
-		return p.Backoff(attempt)
+		d = p.Backoff(attempt)
 	}
-	return p.RetryDelay
+	if r, ok := errors.AsType[*runner.RepetirEm](err); ok {
+		d = max(d, r.Depois)
+	}
+	return d
 }

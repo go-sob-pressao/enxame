@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/webhook"
 	"github.com/go-sob-pressao/enxame/internal/transport/resilience"
 	"github.com/go-sob-pressao/enxame/internal/worker/runner"
@@ -35,6 +36,10 @@ type Store interface {
 // ErrOcupado indica que o endpoint já tem entregas demais em curso.
 var ErrOcupado = errors.New("endpoint com entregas demais em curso")
 
+// ErrLimite indica que o endpoint chegou ao limite de entregas por
+// segundo que o cliente pediu.
+var ErrLimite = errors.New("limite de entregas por segundo do endpoint")
+
 // Entregador executa os jobs de fan-out e de entrega.
 type Entregador struct {
 	Store    Store
@@ -47,8 +52,9 @@ type Entregador struct {
 	Segredo func(ref string) (string, error)
 	Now     func() time.Time
 
-	mu    sync.Mutex
-	vagas map[string]chan struct{}
+	mu     sync.Mutex
+	vagas  map[string]chan struct{}
+	baldes map[string]*policy.TokenBucket
 }
 
 // Novo cria o entregador com os padrões do Enxame: breaker de 5 falhas
@@ -114,6 +120,9 @@ func (d *Entregador) Entregar(ctx context.Context, j job.Job) error {
 	if err := d.Breakers.Permitir(e.ID, d.Now()); err != nil {
 		return err
 	}
+	if espera, ok := d.taxa(e); !ok {
+		return &runner.RepetirEm{Depois: espera, Err: ErrLimite}
+	}
 	liberar, err := d.vaga(e.ID)
 	if err != nil {
 		return err
@@ -125,7 +134,7 @@ func (d *Entregador) Entregar(ctx context.Context, j job.Job) error {
 	}
 	t := webhook.Tentativa{MessageID: m.ID, EndpointID: e.ID,
 		Attempt: j.Attempt, JobID: j.ID.String(), Em: d.Now()}
-	status, err := d.enviar(ctx, e, m, &t)
+	status, depois, err := d.enviar(ctx, e, m, &t)
 	if err != nil {
 		t.Erro = err.Error()
 	}
@@ -144,6 +153,10 @@ func (d *Entregador) Entregar(ctx context.Context, j job.Job) error {
 		motivo := "o endpoint respondeu 410 Gone"
 		return runner.Permanent(errors.Join(errors.New(motivo),
 			d.Store.DisableEndpoint(ctx, e.Namespace, e.ID, motivo)))
+	case resultado == webhook.Desacelere && depois > 0:
+		// O endpoint disse quando voltar: o pool não repete antes.
+		return &runner.RepetirEm{Depois: depois,
+			Err: fmt.Errorf("endpoint respondeu %d", status)}
 	}
 	return fmt.Errorf("endpoint respondeu %d", status)
 }
@@ -155,26 +168,26 @@ func (d *Entregador) enviar(
 	e webhook.Endpoint,
 	m webhook.Mensagem,
 	t *webhook.Tentativa,
-) (int, error) {
+) (int, time.Duration, error) {
 	segredo, err := d.Segredo(e.SecretRef)
 	if err != nil {
-		return 0, runner.Permanent(err)
+		return 0, 0, runner.Permanent(err)
 	}
 	chave, err := webhook.Chave(segredo)
 	if err != nil {
-		return 0, runner.Permanent(err)
+		return 0, 0, runner.Permanent(err)
 	}
 	corpo, err := json.Marshal(map[string]any{"type": m.EventType,
 		"timestamp": m.CriadaEm.UTC(),
 		"data":      json.RawMessage(m.Payload)})
 	if err != nil {
-		return 0, runner.Permanent(err)
+		return 0, 0, runner.Permanent(err)
 	}
 	agora := d.Now()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.URL,
 		bytes.NewReader(corpo))
 	if err != nil {
-		return 0, runner.Permanent(err)
+		return 0, 0, runner.Permanent(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("webhook-id", m.ID)
@@ -185,11 +198,11 @@ func (d *Entregador) enviar(
 	resp, err := d.Cliente.Do(req)
 	t.Duracao = d.Now().Sub(agora)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer resp.Body.Close()
 	t.Status, t.Trecho = resp.StatusCode, lerResposta(resp.Body)
-	return resp.StatusCode, nil
+	return resp.StatusCode, retryAfter(resp.Header, d.Now()), nil
 }
 
 // vaga ocupa uma das vagas do endpoint, sem esperar: sem vaga, a
@@ -226,4 +239,45 @@ func SegredoDoAmbiente(ref string) (string, error) {
 		return "", fmt.Errorf("variável %s vazia", nome)
 	}
 	return v, nil
+}
+
+// livro:inicio taxa
+
+// taxa aplica o limite de entregas por segundo do endpoint, se ele
+// tiver um. O balde é do processo: com três nós entregando, o endpoint
+// recebe até três vezes o limite — o preço de um limite local.
+func (d *Entregador) taxa(e webhook.Endpoint) (time.Duration, bool) {
+	if e.RateLimit <= 0 {
+		return 0, true
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.baldes == nil {
+		d.baldes = map[string]*policy.TokenBucket{}
+	}
+	b, ok := d.baldes[e.ID]
+	if !ok || b.Taxa != float64(e.RateLimit) {
+		b = &policy.TokenBucket{Taxa: float64(e.RateLimit),
+			Rajada: float64(e.RateLimit)}
+		d.baldes[e.ID] = b
+	}
+	ok, espera := b.Tomar(d.Now())
+	return espera, ok
+}
+
+// livro:fim taxa
+
+// retryAfter lê o cabeçalho Retry-After, em segundos ou como data.
+func retryAfter(h http.Header, agora time.Time) time.Duration {
+	v := h.Get("Retry-After")
+	if v == "" {
+		return 0
+	}
+	if s, err := strconv.Atoi(v); err == nil && s > 0 {
+		return time.Duration(s) * time.Second
+	}
+	if t, err := http.ParseTime(v); err == nil && t.After(agora) {
+		return t.Sub(agora)
+	}
+	return 0
 }

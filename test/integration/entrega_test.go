@@ -146,3 +146,24 @@ func TestGoneDesativaOEndpoint(t *testing.T) {
 		t.Fatalf("endpoint %+v, %v", e, err)
 	}
 }
+
+// O endpoint responde 429 com Retry-After: 2 na primeira; a segunda
+// tentativa só sai depois de dois segundos, apesar do backoff de 20 ms.
+func TestRetryAfterRespeitado(t *testing.T) {
+	var primeira, segunda time.Time
+	c := entrega(t, func(n int) int {
+		if n == 1 {
+			primeira = time.Now()
+			return http.StatusTooManyRequests
+		}
+		segunda = time.Now()
+		return http.StatusOK
+	}, 10)
+	c.esperar(t, `SELECT count(*) FROM job
+		WHERE kind = 'webhook.deliver' AND state = 'completed'`, 1)
+	t.Logf("segunda tentativa %v depois da primeira",
+		segunda.Sub(primeira).Round(100*time.Millisecond))
+	if segunda.Sub(primeira) < 2*time.Second {
+		t.Fatal("o Retry-After não foi respeitado")
+	}
+}

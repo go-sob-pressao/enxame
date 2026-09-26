@@ -12,12 +12,14 @@ import (
 )
 
 const colunasEndpoint = `endpoint_id::text, namespace, url, description,
-	event_types, secret_ref, disabled_at IS NOT NULL, created_at`
+	event_types, secret_ref, coalesce(rate_limit_rps, 0),
+	disabled_at IS NOT NULL, created_at`
 
 func lerEndpoint(r pgx.Row) (webhook.Endpoint, error) {
 	var e webhook.Endpoint
 	err := r.Scan(&e.ID, &e.Namespace, &e.URL, &e.Description,
-		&e.EventTypes, &e.SecretRef, &e.Disabled, &e.CreatedAt)
+		&e.EventTypes, &e.SecretRef, &e.RateLimit, &e.Disabled,
+		&e.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return e, store.ErrNotFound
 	}
@@ -32,19 +34,12 @@ func (s *Store) CreateEndpoint(
 	if e.EventTypes == nil {
 		e.EventTypes = []string{}
 	}
-	return lerEndpoint(
-		s.pool.QueryRow(
-			ctx,
-			`INSERT INTO webhook_endpoint
-		(namespace, url, description, event_types, secret_ref)
-		VALUES ($1, $2, $3, $4, $5) RETURNING `+colunasEndpoint,
-			e.Namespace,
-			e.URL,
-			e.Description,
-			e.EventTypes,
-			e.SecretRef,
-		),
-	)
+	return lerEndpoint(s.pool.QueryRow(ctx, `INSERT INTO
+		webhook_endpoint (namespace, url, description, event_types,
+		secret_ref, rate_limit_rps)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING `+colunasEndpoint,
+		e.Namespace, e.URL, e.Description, e.EventTypes, e.SecretRef,
+		nuloInt(e.RateLimit)))
 }
 
 // ListEndpoints devolve os endpoints do namespace, os mais novos antes.

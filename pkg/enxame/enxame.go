@@ -211,6 +211,7 @@ type Endpoint struct {
 	URL        string
 	EventTypes []string // vazio: todos
 	SecretRef  string   // env:NOME — o segredo whsec_… fica no ambiente
+	RateLimit  int      // entregas por segundo; zero: sem limite
 }
 
 // CreateEndpoint inscreve um endpoint no namespace do cliente.
@@ -219,7 +220,8 @@ func (c *Client) CreateEndpoint(
 	e Endpoint,
 ) (string, error) {
 	n := nucleo.Endpoint{Namespace: c.namespace, URL: e.URL,
-		EventTypes: e.EventTypes, SecretRef: e.SecretRef}
+		EventTypes: e.EventTypes, SecretRef: e.SecretRef,
+		RateLimit: e.RateLimit}
 	if err := nucleo.Validar(n); err != nil {
 		return "", err
 	}

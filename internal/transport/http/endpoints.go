@@ -23,7 +23,8 @@ func (a *API) criarEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	e := webhook.Endpoint{Namespace: namespace(r.Context()),
 		URL: n.URL, Description: n.Description,
-		EventTypes: n.EventTypes, SecretRef: n.SecretRef}
+		EventTypes: n.EventTypes, SecretRef: n.SecretRef,
+		RateLimit: n.RateLimit}
 	if err := webhook.Validar(e); err != nil {
 		a.erro(w, r, err)
 		return
@@ -70,5 +71,6 @@ func (a *API) desativarEndpoint(
 func paraEndpoint(e webhook.Endpoint) Endpoint {
 	return Endpoint{ID: e.ID, URL: e.URL, Description: e.Description,
 		EventTypes: e.EventTypes, SecretRef: e.SecretRef,
-		Disabled: e.Disabled, CreatedAt: e.CreatedAt.UTC()}
+		RateLimit: e.RateLimit,
+		Disabled:  e.Disabled, CreatedAt: e.CreatedAt.UTC()}
 }
