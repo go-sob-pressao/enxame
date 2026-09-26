@@ -32,7 +32,8 @@ func TestTentativaResgatadaNaoConclui(t *testing.T) {
 		t0.Add(time.Second)); n != 1 || err != nil {
 		t.Fatalf("resgate: %d %v", n, err)
 	}
-	if _, err := s.Promote(t.Context(), t0.Add(2*time.Minute)); err != nil {
+	_, err = s.Promote(t.Context(), t0.Add(2*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 	novo := postgres.NewFila(t.Context(), s)
