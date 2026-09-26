@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
@@ -137,9 +139,44 @@ func (r *Remoto) terminar(
 	r.mu.Unlock()
 	req.JobId = jid.String()
 	req.Attempt = int32(tentativa) //nolint:gosec // cabe
-	_, err := r.cliente.Finish(r.ctx, req)
-	return err
+	return repetir(r.ctx, func() error {
+		_, err := r.cliente.Finish(r.ctx, req)
+		return err
+	})
 }
+
+// livro:inicio repetir
+
+// repetir tenta de novo o que falhou por motivo passageiro — a rede, o
+// prazo, um conflito —, até três vezes. Se ainda assim não der, desiste
+// sem erro: o job continua em execução no motor, sem batimento, e o
+// resgate o devolve à fila. Derrubar o pool por causa de uma rede
+// instável transformaria uma falha de um job em falha de todos.
+func repetir(ctx context.Context, f func() error) error {
+	espera := 100 * time.Millisecond
+	for tentativa := 1; ; tentativa++ {
+		err := f()
+		switch status.Code(err) {
+		case codes.OK, codes.NotFound:
+			return nil // feito, ou o job nem existe mais
+		case codes.Unavailable, codes.DeadlineExceeded,
+			codes.Aborted, codes.Internal:
+			if tentativa == 3 {
+				return nil // o resgate decide
+			}
+		default: // perdida, sem autenticação: quem chama decide
+			return err
+		}
+		select {
+		case <-time.After(espera):
+			espera *= 2
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+// livro:fim repetir
 
 // Heartbeat diz ao motor que a tentativa continua viva.
 func (r *Remoto) Heartbeat(
