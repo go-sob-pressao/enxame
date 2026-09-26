@@ -9,7 +9,7 @@ LDFLAGS := -s -w -X main.versao=$(VERSAO)
 PKGS    := ./...
 
 .DEFAULT_GOAL := help
-.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto clean defeitos
+.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto ferramentas-proto clean defeitos
 
 help:            ## lista os alvos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -81,9 +81,14 @@ up:              ## sobe Postgres, Jaeger, Prometheus e Grafana locais
 down:
 	docker compose -f deploy/docker/compose.yaml down -v
 
-proto:           ## gera código gRPC com buf (Cap. 18)
-	@if find internal/transport/grpc/proto -name '*.proto' | grep -q .; then buf generate; \
-	else echo "proto: SKIP — nenhum .proto ainda; entram no Capítulo 18"; fi
+proto:           ## gera código gRPC com buf e plugins locais (Cap. 18)
+	buf lint
+	buf generate
+
+ferramentas-proto: ## instala buf e os plugins nas versões fixadas
+	$(GO) install github.com/bufbuild/buf/cmd/buf@v1.73.0
+	$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+	$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
 
 clean:
 	rm -rf bin dist coverage.out
