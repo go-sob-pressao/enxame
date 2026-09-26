@@ -4,6 +4,7 @@
 package rafttest
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -27,6 +28,7 @@ type Cluster struct {
 	violacoes  []string
 	Entregues  int // mensagens entregues
 	Descartes  int // mensagens descartadas por queda ou partição
+	Snapshots  int // snapshots instalados
 	TicksDados int
 }
 
@@ -97,6 +99,9 @@ func (c *Cluster) Run(n int) {
 func (c *Cluster) coletar(id raft.NodeID) {
 	r := c.nodes[id].Ready()
 	c.fila = append(c.fila, r.Messages...)
+	if r.Snapshot != nil {
+		c.instalar(id, r.Snapshot)
+	}
 	c.aplicar(id, r.Committed)
 	c.registrarLideres()
 }
@@ -262,4 +267,35 @@ func (c *Cluster) Bloquear(de raft.NodeID, tipo raft.MessageType) {
 // Violations devolve as violações de segurança observadas.
 func (c *Cluster) Violations() []string {
 	return slices.Clone(c.violacoes)
+}
+
+// Compactar tira um snapshot do nó id com tudo o que ele já aplicou. O
+// conteúdo do snapshot é a própria lista de entradas aplicadas: assim a
+// verificação de segurança continua valendo depois da instalação.
+func (c *Cluster) Compactar(id raft.NodeID) error {
+	aplicadas := c.aplicados[id]
+	if len(aplicadas) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(aplicadas)
+	if err != nil {
+		return err
+	}
+	return c.nodes[id].Compact(aplicadas[len(aplicadas)-1].Index, data)
+}
+
+// instalar substitui o que o nó tinha aplicado pelo conteúdo do
+// snapshot.
+func (c *Cluster) instalar(id raft.NodeID, s *raft.Snapshot) {
+	c.Snapshots++
+	var entradas []raft.Entry
+	if err := json.Unmarshal(s.Data, &entradas); err != nil {
+		c.violacoes = append(
+			c.violacoes,
+			"snapshot ilegível: "+err.Error(),
+		)
+		return
+	}
+	c.aplicados[id] = nil
+	c.aplicar(id, entradas)
 }

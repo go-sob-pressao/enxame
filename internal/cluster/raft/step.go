@@ -10,7 +10,7 @@ func (n *Node) Step(m Message) {
 	switch {
 	case m.Term > n.term:
 		lider := NodeID(0)
-		if m.Type == MsgApp {
+		if m.Type == MsgApp || m.Type == MsgSnap {
 			lider = m.From
 		}
 		n.becomeFollower(m.Term, lider)
@@ -27,6 +27,8 @@ func (n *Node) Step(m Message) {
 		n.handleApp(m)
 	case MsgAppResp:
 		n.handleAppResp(m)
+	case MsgSnap:
+		n.handleSnap(m)
 	}
 }
 

@@ -9,6 +9,7 @@ const (
 	MsgVoteResp                        // resposta ao RequestVote
 	MsgApp                             // AppendEntries (e heartbeat)
 	MsgAppResp                         // resposta ao AppendEntries
+	MsgSnap                            // InstallSnapshot
 )
 
 // Message é uma mensagem entre dois nós. Só os campos do tipo
@@ -37,4 +38,7 @@ type Message struct {
 	Success bool
 	Match   Index
 	Hint    Index
+
+	// MsgSnap: o snapshot do líder.
+	Snapshot *Snapshot
 }

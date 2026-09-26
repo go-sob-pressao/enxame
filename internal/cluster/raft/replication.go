@@ -32,6 +32,10 @@ func (n *Node) broadcastAppend() {
 // heartbeat.
 func (n *Node) sendAppend(p NodeID) {
 	anterior := n.next[p] - 1
+	if anterior < n.base() {
+		n.sendSnapshot(p) // o que ele precisa já virou snapshot aqui
+		return
+	}
 	termoAnterior, _ := n.termAt(anterior)
 	n.send(Message{
 		Type:      MsgApp,
@@ -52,6 +56,17 @@ func (n *Node) sendAppend(p NodeID) {
 // conflitar com o líder, acrescenta o que faltar e avança o commit.
 func (n *Node) handleApp(m Message) {
 	n.becomeFollower(m.Term, m.From)
+	if m.PrevIndex < n.commit {
+		// tudo até o meu commit já coincide com o líder; responder
+		// assim também cobre o prefixo que eu já absorvi num snapshot
+		n.send(Message{
+			Type:    MsgAppResp,
+			To:      m.From,
+			Success: true,
+			Match:   n.commit,
+		})
+		return
+	}
 	if t, ok := n.termAt(m.PrevIndex); !ok || t != m.PrevTerm {
 		dica := min(n.lastIndex(), m.PrevIndex-1)
 		n.send(Message{Type: MsgAppResp, To: m.From, Hint: dica})

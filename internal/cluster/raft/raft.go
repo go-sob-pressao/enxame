@@ -70,6 +70,9 @@ type Node struct {
 	next     map[NodeID]Index
 	match    map[NodeID]Index
 
+	snapshot *Snapshot // o último, tirado aqui ou recebido do líder
+	instalar *Snapshot // recebido e ainda não entregue em Ready
+
 	outbox []Message
 }
 
@@ -97,7 +100,7 @@ type Status struct {
 
 // Status devolve o estado corrente.
 func (n *Node) Status() Status {
-	return Status{
+	st := Status{
 		ID:        n.cfg.ID,
 		State:     n.state,
 		Term:      n.term,
@@ -105,20 +108,24 @@ func (n *Node) Status() Status {
 		Commit:    n.commit,
 		LastIndex: n.lastIndex(),
 	}
+	return st
 }
 
 // Ready é o que o nó produziu desde a última chamada: mensagens para
 // entregar aos outros nós e entradas comitadas para a aplicação
 // aplicar, em ordem.
 type Ready struct {
-	Messages  []Message
+	Messages []Message
+	// Snapshot, se não for nil, substitui o estado da aplicação e vem
+	// antes de Committed.
+	Snapshot  *Snapshot
 	Committed []Entry
 }
 
 // Ready entrega (e esquece) o que o nó produziu.
 func (n *Node) Ready() Ready {
-	r := Ready{Messages: n.outbox}
-	n.outbox = nil
+	r := Ready{Messages: n.outbox, Snapshot: n.instalar}
+	n.outbox, n.instalar = nil, nil
 	if n.commit > n.entregue {
 		r.Committed = n.slice(n.entregue+1, n.commit+1)
 		n.entregue = n.commit
