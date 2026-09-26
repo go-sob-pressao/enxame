@@ -26,8 +26,6 @@ type Config struct {
 	Log       *slog.Logger
 }
 
-// livro:inicio pgcoord
-
 // Coord implementa coordinator.Coordinator sobre o PostgreSQL: lease
 // de liderança numa linha de controle, com o termo como fencing token,
 // e um mapa por época, gravado só pelo líder. Quem está vivo vem do
@@ -92,6 +90,8 @@ func (c *Coord) ciclo(ctx context.Context) error {
 	return c.reler(ctx, termo)
 }
 
+// livro:inicio pgcoord-lideranca
+
 // adquirirOuRenovar: o UPDATE só acontece se o lease venceu ou já é
 // deste nó; o termo só cresce quando a liderança muda de dono.
 func (c *Coord) adquirirOuRenovar(ctx context.Context) (int64, error) {
@@ -109,6 +109,10 @@ func (c *Coord) adquirirOuRenovar(ctx context.Context) (int64, error) {
 	}
 	return termo, err
 }
+
+// livro:fim pgcoord-lideranca
+
+// livro:inicio pgcoord-mapa
 
 // redistribuir grava um mapa novo se os vivos não são os donos do mapa
 // corrente. O FOR SHARE na linha do líder é o fencing: um líder antigo,
@@ -148,7 +152,7 @@ func (c *Coord) redistribuir(ctx context.Context, termo int64) error {
 	})
 }
 
-// livro:fim pgcoord
+// livro:fim pgcoord-mapa
 
 func ultimoMapa(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
