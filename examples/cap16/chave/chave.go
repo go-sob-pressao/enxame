@@ -18,10 +18,13 @@ type Assinatura struct {
 	Valor   int    `json:"valor"`
 }
 
+// Handler é a assinatura de um handler de job.
+type Handler = func(context.Context, job.Job) error
+
 // livro:inicio chave-defeito
 
 // CobrarComUUID usa uma chave de idempotência — nova a cada chamada.
-func CobrarComUUID(g *gateway.Gateway) func(context.Context, job.Job) error {
+func CobrarComUUID(g *gateway.Gateway) Handler {
 	return func(ctx context.Context, j job.Job) error {
 		var a Assinatura
 		if err := json.Unmarshal(j.Args, &a); err != nil {
@@ -38,7 +41,7 @@ func CobrarComUUID(g *gateway.Gateway) func(context.Context, job.Job) error {
 // livro:inicio chave-correta
 
 // Cobrar usa a chave do job, a mesma em todas as tentativas.
-func Cobrar(g *gateway.Gateway) func(context.Context, job.Job) error {
+func Cobrar(g *gateway.Gateway) Handler {
 	return func(ctx context.Context, j job.Job) error {
 		var a Assinatura
 		if err := json.Unmarshal(j.Args, &a); err != nil {

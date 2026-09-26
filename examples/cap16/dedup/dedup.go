@@ -18,8 +18,9 @@ const Esquema = `CREATE TABLE efeito (
     em     TIMESTAMPTZ NOT NULL DEFAULT now()
 );`
 
-// ErrIncerto: outra tentativa começou o efeito e não registrou o fim.
-// Pode ter acontecido ou não; só quem conhece o efeito sabe o que fazer.
+// ErrIncerto indica que outra tentativa começou o efeito e não
+// registrou o fim. Ele pode ter acontecido ou não; só quem conhece o
+// efeito sabe o que fazer.
 var ErrIncerto = errors.New("efeito iniciado sem conclusão registrada")
 
 // Dedup executa efeitos uma vez por chave. Falha, quando não é nil, é
@@ -56,7 +57,7 @@ func (d *Dedup) Executar(
 		return ErrIncerto
 	}
 	if err := efeito(ctx); err != nil {
-		// Falha definitiva do efeito: libera a chave para nova tentativa.
+		// Falha definitiva do efeito: libera a chave para outra vez.
 		_, _ = d.DB.Exec(ctx, `DELETE FROM efeito
 			WHERE chave = $1 AND estado = 'iniciado'`, chave)
 		return err
@@ -75,9 +76,9 @@ func (d *Dedup) Executar(
 
 // livro:inicio dedup-local
 
-// ExecutarLocal é para efeitos no mesmo banco: a chave e o efeito entram
-// na mesma transação, e a janela desaparece. Exatamente uma vez, de
-// verdade — mas só para o que mora no banco.
+// ExecutarLocal é para efeitos no mesmo banco: a chave e o efeito
+// entram na mesma transação, e a janela desaparece. Exatamente uma vez,
+// de verdade — mas só para o que mora no banco.
 func (d *Dedup) ExecutarLocal(
 	ctx context.Context,
 	chave string,
