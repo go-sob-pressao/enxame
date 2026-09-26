@@ -1,5 +1,5 @@
-// Package retentar é o enigma do Capítulo 21: a fila limitada a 100
-// que nunca passava de 100 — e o processo que morria sem memória.
+// Package retentar é o enigma do Capítulo 21: a fila limitada a 10 mil
+// que nunca passava de 10 mil — e o processo que morria sem memória.
 package retentar
 
 import "sync"

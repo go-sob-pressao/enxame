@@ -30,31 +30,31 @@ func simular(t *testing.T, f *retentar.Fila, passos int) {
 		for range 2 {
 			f.Processar(func(retentar.Item) error { return errFora })
 		}
-		if (p+1)%2000 == 0 {
+		if (p+1)%5000 == 0 {
 			c, r := f.Tamanho()
-			t.Logf("%5d ms: canal %3d  retentar %6d  (%d KiB)  "+
+			t.Logf("%5d ms: canal %5d  retentar %5d  "+
 				"aceitos %5d  recusados %5d",
-				p+1, c, r, r, aceitos, recusados)
+				p+1, c, r, aceitos, recusados)
 		}
 	}
 }
 
 // livro:inicio enigma-teste
 
-// O canal nunca passa de 100. A memória, sim.
+// O canal nunca passa de 10 mil. A memória, sim.
 func TestFilaLimitadaCresce(t *testing.T) {
-	f := retentar.Nova(100)
-	simular(t, f, 10000)
-	if c, r := f.Tamanho(); c > 100 || r < 10000 {
+	f := retentar.Nova(10000)
+	simular(t, f, 30000)
+	if c, r := f.Tamanho(); c > 10000 || r < 30000 {
 		t.Fatalf("canal %d, retentar %d", c, r)
 	}
 }
 
 // Com o limite no sistema inteiro, retentar para de crescer.
 func TestLimiteNoSistema(t *testing.T) {
-	f := retentar.Limitada(100, 1000)
-	simular(t, f, 10000)
-	if c, r := f.Tamanho(); c+r > 1000 {
+	f := retentar.Limitada(10000, 10000)
+	simular(t, f, 30000)
+	if c, r := f.Tamanho(); c+r > 10000 {
 		t.Fatalf("canal %d, retentar %d", c, r)
 	}
 }

@@ -2,7 +2,7 @@
 
 | Diretório | O que mostra |
 |---|---|
-| `retentar/` | o enigma: um canal limitado a 100 ao lado de uma lista de retentativas sem limite — e a correção, com o limite no sistema inteiro |
+| `retentar/` | o enigma: um canal limitado a 10 mil ao lado de uma lista de retentativas sem limite — e a correção, com o limite no sistema inteiro |
 
 O gerador de carga em malha aberta está em `test/load`:
 
