@@ -43,6 +43,11 @@ func (n *Node) campaign() {
 
 // livro:fim campaign
 
+// Campaign força uma eleição agora, sem esperar o timeout. Usado em
+// testes que precisam de um roteiro exato, e na transferência de
+// liderança.
+func (n *Node) Campaign() { n.campaign() }
+
 // livro:inicio papeis
 
 func (n *Node) becomeFollower(term Term, leader NodeID) {
@@ -68,7 +73,12 @@ func (n *Node) becomeLeader() {
 	for _, p := range n.cfg.Peers {
 		n.next[p], n.match[p] = n.lastIndex()+1, 0
 	}
+	if n.entradaDeLideranca() {
+		i := n.lastIndex() + 1
+		n.log = append(n.log, Entry{Term: n.term, Index: i})
+	}
 	n.match[n.cfg.ID] = n.lastIndex()
+	n.maybeCommit()
 	n.broadcastAppend()
 }
 
@@ -82,9 +92,11 @@ func (n *Node) resetElectionTimer() {
 // livro:inicio votar
 
 // handleVote decide o voto. Um voto por termo: quem já votou em outro
-// candidato neste termo nega.
+// candidato neste termo nega. E só vota em quem tem o log pelo menos
+// tão atualizado quanto o seu (restrição de eleição, etapa 3).
 func (n *Node) handleVote(m Message) {
-	conceder := n.votedFor == 0 || n.votedFor == m.From
+	livre := n.votedFor == 0 || n.votedFor == m.From
+	conceder := livre && n.logAtualizado(m)
 	if conceder {
 		n.votedFor = m.From
 		n.resetElectionTimer()

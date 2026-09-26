@@ -1,22 +1,13 @@
+//go:build !defeito_eleicao
+
 package raft_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/go-sob-pressao/enxame/internal/cluster/raft"
 	"github.com/go-sob-pressao/enxame/internal/cluster/raft/rafttest"
 )
-
-func propor(t *testing.T, c *rafttest.Cluster, n int, prefixo string) {
-	t.Helper()
-	for i := range n {
-		if err := c.Propose(fmt.Appendf(nil, "%s-%d", prefixo, i)); err != nil {
-			t.Fatal(err)
-		}
-		c.Tick()
-	}
-}
 
 // livro:inicio teste-replicacao
 

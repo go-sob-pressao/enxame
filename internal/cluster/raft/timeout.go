@@ -1,4 +1,4 @@
-//go:build !defeito
+//go:build !defeito_eleicao
 
 package raft
 

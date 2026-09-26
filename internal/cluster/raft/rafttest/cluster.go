@@ -19,6 +19,7 @@ type Cluster struct {
 	fila  []raft.Message
 	fora  map[raft.NodeID]bool
 	corte map[[2]raft.NodeID]bool
+	bloq  map[bloqueio]bool
 
 	lideres    map[raft.Term]raft.NodeID
 	aplicados  map[raft.NodeID][]raft.Entry
@@ -49,6 +50,7 @@ func New(n int, seed uint64, o Opcoes) *Cluster {
 		nodes:     map[raft.NodeID]*raft.Node{},
 		fora:      map[raft.NodeID]bool{},
 		corte:     map[[2]raft.NodeID]bool{},
+		bloq:      map[bloqueio]bool{},
 		lideres:   map[raft.Term]raft.NodeID{},
 		aplicados: map[raft.NodeID][]raft.Entry{},
 		porIndice: map[raft.Index]raft.Entry{},
@@ -130,6 +132,20 @@ func (c *Cluster) Aplicados(id raft.NodeID) [][]byte {
 	return out
 }
 
+// Campaign força o nó a se candidatar agora e entrega o que isso gerar.
+func (c *Cluster) Campaign(id raft.NodeID) {
+	c.nodes[id].Campaign()
+	c.coletar(id)
+	c.entregar()
+}
+
+// ProposeTo entrega o comando ao nó id, seja ele líder ou não.
+func (c *Cluster) ProposeTo(id raft.NodeID, data []byte) {
+	_, _ = c.nodes[id].Propose(data)
+	c.coletar(id)
+	c.entregar()
+}
+
 // ErrSemLider é devolvido por Propose quando não há líder.
 var ErrSemLider = errors.New("rafttest: nenhum líder")
 
@@ -150,7 +166,8 @@ func (c *Cluster) entregar() {
 		m := c.fila[0]
 		c.fila = c.fila[1:]
 		if c.fora[m.From] || c.fora[m.To] ||
-			c.corte[[2]raft.NodeID{m.From, m.To}] {
+			c.corte[[2]raft.NodeID{m.From, m.To}] ||
+			c.bloq[bloqueio{m.From, m.Type}] {
 			c.Descartes++
 			continue
 		}
@@ -204,25 +221,43 @@ func (c *Cluster) Crash(id raft.NodeID) { c.fora[id] = true }
 // Recover devolve o nó ao grupo, com o estado que tinha.
 func (c *Cluster) Recover(id raft.NodeID) { delete(c.fora, id) }
 
-// Partition separa os nós em grupos que não se falam entre si.
+// Partition define a topologia inteira: nós no mesmo grupo se falam,
+// nós em grupos diferentes não. Substitui a partição anterior; um nó
+// que não aparece em nenhum grupo fica isolado.
 func (c *Cluster) Partition(grupos ...[]raft.NodeID) {
+	clear(c.corte)
 	grupo := map[raft.NodeID]int{}
 	for g, ids := range grupos {
 		for _, id := range ids {
-			grupo[id] = g
+			grupo[id] = g + 1
 		}
 	}
 	for _, a := range c.ids {
 		for _, b := range c.ids {
-			if grupo[a] != grupo[b] {
+			if a != b && (grupo[a] == 0 || grupo[a] != grupo[b]) {
 				c.corte[[2]raft.NodeID{a, b}] = true
 			}
 		}
 	}
 }
 
-// Heal desfaz todas as partições.
-func (c *Cluster) Heal() { clear(c.corte) }
+// Heal desfaz todas as partições e bloqueios.
+func (c *Cluster) Heal() {
+	clear(c.corte)
+	clear(c.bloq)
+}
+
+type bloqueio struct {
+	de   raft.NodeID
+	tipo raft.MessageType
+}
+
+// Bloquear descarta toda mensagem do tipo enviada pelo nó de. Serve aos
+// roteiros exatos: um líder que recebe os votos, mas cujo AppendEntries
+// nunca chega.
+func (c *Cluster) Bloquear(de raft.NodeID, tipo raft.MessageType) {
+	c.bloq[bloqueio{de, tipo}] = true
+}
 
 // Violations devolve as violações de segurança observadas.
 func (c *Cluster) Violations() []string {

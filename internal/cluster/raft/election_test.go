@@ -1,19 +1,13 @@
+//go:build !defeito_eleicao
+
 package raft_test
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/go-sob-pressao/enxame/internal/cluster/raft"
 	"github.com/go-sob-pressao/enxame/internal/cluster/raft/rafttest"
 )
-
-func semViolacoes(t *testing.T, c *rafttest.Cluster) {
-	t.Helper()
-	if v := c.Violations(); len(v) > 0 {
-		t.Fatalf("violações de segurança: %v", v)
-	}
-}
 
 // livro:inicio teste-eleicao
 
@@ -98,8 +92,4 @@ func TestParticaoMinoritaria(t *testing.T) {
 		t.Fatalf("o antigo líder %d não desceu depois da cura", antigo)
 	}
 	semViolacoes(t, c)
-}
-
-func contem(ids []raft.NodeID, id raft.NodeID) bool {
-	return slices.Contains(ids, id)
 }
