@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -40,6 +41,9 @@ func Run(t *testing.T, novo func(t *testing.T) Store) {
 	})
 	t.Run("MesmaPosicaoDuasVezes", func(t *testing.T) {
 		mesmaPosicao(t, novo(t))
+	})
+	t.Run("VersionProtegeRunsAntigos", func(t *testing.T) {
+		versao(t, novo)
 	})
 }
 
@@ -235,5 +239,95 @@ func mesmaPosicao(t *testing.T, s Store) {
 	})
 	if !errors.Is(err, store.ErrDuplicate) {
 		t.Fatalf("segundo run aberto: %v", err)
+	}
+}
+
+// pedido é o workflow nas duas versões do código: a nova acrescenta um
+// passo no meio, com ou sem workflow.Version.
+func pedido(
+	novo, comVersion bool,
+	minimo int,
+	feitos *[]string,
+) wf.Func {
+	passo := func(c *workflow.Context, nome string) error {
+		_, err := workflow.Step(c, nome,
+			func(context.Context) (bool, error) {
+				*feitos = append(*feitos, nome)
+				return true, nil
+			})
+		return err
+	}
+	return func(c *workflow.Context, _ json.RawMessage) (any, error) {
+		if err := passo(c, "cobrar"); err != nil {
+			return nil, err
+		}
+		reservar := novo
+		if novo && comVersion {
+			v, err := workflow.Version(c, "reservar-estoque", minimo, 1)
+			if err != nil {
+				return nil, err
+			}
+			reservar = v == 1
+		}
+		if reservar {
+			if err := passo(c, "reservar-estoque"); err != nil {
+				return nil, err
+			}
+		}
+		if err := workflow.Sleep(c, "esperar", time.Hour); err != nil {
+			return nil, err
+		}
+		return nil, passo(c, "emitir-nota")
+	}
+}
+
+func versao(t *testing.T, novo func(t *testing.T) Store) {
+	s := novo(t)
+	rel := &relogio{t0}
+	var feitos []string
+	avancar := func(fn wf.Func, id string) (wf.Outcome, error) {
+		r := &wf.Replayer{Store: s, Now: rel.agora,
+			Funcs: map[string]wf.Func{"f": fn}}
+		return r.Advance(t.Context(), id)
+	}
+	// Um run começa com o código antigo e dorme depois de cobrar.
+	antigo := iniciar(t, s, "f")
+	if _, err := avancar(pedido(false, false, 0, &feitos),
+		antigo); err != nil {
+		t.Fatal(err)
+	}
+	rel.t = t0.Add(2 * time.Hour)
+
+	// O código novo, sem Version, não sabe continuar o run antigo.
+	_, err := avancar(pedido(true, false, 0, &feitos), antigo)
+	var nd *workflow.NonDeterministicError
+	if !errors.As(err, &nd) || nd.Seq != 2 {
+		t.Fatalf("sem Version: %v", err)
+	}
+	// Com minimo 1, o código novo avisa que não continua runs antigos.
+	_, err = avancar(pedido(true, true, 1, &feitos), antigo)
+	if !errors.As(err, &nd) {
+		t.Fatalf("minimo 1, run antigo: %v", err)
+	}
+	// Com Version e minimo 0, o run antigo segue o caminho antigo.
+	o, err := avancar(pedido(true, true, 0, &feitos), antigo)
+	if err != nil || o.State != workflow.RunCompleted {
+		t.Fatalf("com Version, run antigo: %+v, %v", o, err)
+	}
+	// Um run novo grava a versão 1 e reserva o estoque.
+	s = novo(t)
+	feitos = nil
+	rel.t = t0
+	novoRun := iniciar(t, s, "f")
+	if _, err := avancar(pedido(true, true, 0, &feitos),
+		novoRun); err != nil {
+		t.Fatal(err)
+	}
+	_, passos, _ := s.LoadRun(t.Context(), novoRun)
+	if len(passos) != 4 || passos[1].Kind != workflow.KindVersion {
+		t.Fatalf("passos do run novo: %+v", passos)
+	}
+	if !slices.Equal(feitos, []string{"cobrar", "reservar-estoque"}) {
+		t.Fatalf("run novo executou %v", feitos)
 	}
 }
