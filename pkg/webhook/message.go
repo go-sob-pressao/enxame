@@ -7,7 +7,7 @@ package webhook
 type Message struct {
 	EventType      string
 	Payload        any    // serializado em JSON
-	IdempotencyKey string // opcional: a mesma chave não grava duas vezes
+	IdempotencyKey string // opcional: a mesma chave não grava de novo
 }
 
 // Os nomes do job que distribui a mensagem aos endpoints.

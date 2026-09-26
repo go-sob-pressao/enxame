@@ -17,7 +17,8 @@ import (
 	"github.com/go-sob-pressao/enxame/pkg/workflow"
 )
 
-// ErrDuplicate: já existe um job com a mesma chave única no namespace.
+// ErrDuplicate indica que já existe, no namespace, um job com a mesma
+// chave única.
 var ErrDuplicate = store.ErrDuplicate
 
 // Args são os argumentos tipados de um job; Kind escolhe o handler.
