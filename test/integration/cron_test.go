@@ -54,7 +54,8 @@ func TestCronUmaVezPorJanela(t *testing.T) {
 		&chave); err != nil {
 		t.Fatal(err)
 	}
-	if jobs != 1 || chave != "cron:loja:fechamento:2026-09-25T10:00:00Z" {
+	esperada := "cron:loja:fechamento:2026-09-25T10:00:00Z"
+	if jobs != 1 || chave != esperada {
 		t.Fatalf("%d jobs, chave %s", jobs, chave)
 	}
 }
