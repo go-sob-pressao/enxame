@@ -81,6 +81,28 @@ func Start(j Job, at time.Time, worker string) ([]Event, error) {
 	}, nil
 }
 
+// livro:inicio heartbeat
+
+// Heartbeat registra que a tentativa attempt continua viva. Um
+// batimento de uma tentativa que já terminou — atrasado pela rede, de
+// um worker que foi resgatado — é recusado: ele não pode renovar a
+// tentativa de outro worker.
+func Heartbeat(j Job, at time.Time, attempt int) ([]Event, error) {
+	if err := exigir(j, "bater"); err != nil {
+		return nil, err
+	}
+	if attempt != j.Attempt {
+		return nil, fmt.Errorf(
+			"%w: batimento da tentativa %d; a atual é %d",
+			ErrInvalidTransition, attempt, j.Attempt)
+	}
+	return []Event{
+		{Type: EventHeartbeat, At: at, Attempt: attempt},
+	}, nil
+}
+
+// livro:fim heartbeat
+
 // Complete registra que o handler devolveu nil.
 func Complete(j Job, at time.Time) ([]Event, error) {
 	if err := exigir(j, "concluir"); err != nil {
@@ -190,7 +212,9 @@ func Apply(j Job, e Event) (Job, error) {
 	case EventAttemptStart:
 		j.State, j.Attempt = StateRunning, e.Attempt
 		j.AttemptedAt, j.AttemptedBy = e.At, e.Worker
+		j.HeartbeatAt = time.Time{}
 	case EventHeartbeat:
+		j.HeartbeatAt = e.At
 	case EventAttemptFailed:
 		j.LastError = e.Cause
 	case EventCompleted:

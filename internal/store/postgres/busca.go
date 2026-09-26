@@ -94,19 +94,32 @@ func (s *Store) Promote(
 		})
 }
 
+// Heartbeat registra que a tentativa attempt do job continua viva.
+func (s *Store) Heartbeat(
+	ctx context.Context,
+	jid id.JobID,
+	at time.Time,
+	attempt int,
+) error {
+	_, err := s.Decide(ctx, jid, func(j job.Job) ([]job.Event, error) {
+		return job.Heartbeat(j, at, attempt)
+	})
+	return err
+}
+
 // livro:inicio resgate
 
-// Rescue resgata, em lotes de até 100, os jobs em execução cuja
-// tentativa começou antes de desde: o processo que os reservou morreu
-// sem registrar o fim. É um prazo fixo, não um batimento cardíaco —
-// uma tentativa legítima mais longa que o prazo seria resgatada viva.
-// O lease de verdade é da Parte V.
+// Rescue resgata, em lotes de até 100, os jobs em execução cujo último
+// sinal de vida — o último batimento, ou o início da tentativa — é
+// anterior a desde: o worker morreu, ou perdeu a conexão, sem
+// registrar o fim. Uma tentativa longa que bate a tempo não é
+// resgatada.
 func (s *Store) Rescue(
 	ctx context.Context,
 	at, desde time.Time,
 ) (int, error) {
-	return s.emLote(ctx, `partition_id = 0
-		AND state = 'running' AND attempted_at < $1`,
+	return s.emLote(ctx, `partition_id = 0 AND state = 'running'
+		AND coalesce(heartbeat_at, attempted_at) < $1`,
 		desde, func(j job.Job) ([]job.Event, error) {
 			return job.Rescue(j, at)
 		})

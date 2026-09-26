@@ -38,10 +38,14 @@ var (
 	resgatar = acao{"resgatar", func(j job.Job) ([]job.Event, error) {
 		return job.Rescue(j, t0)
 	}}
+	bater = acao{"bater", func(j job.Job) ([]job.Event, error) {
+		return job.Heartbeat(j, t0, j.Attempt)
+	}}
 )
 
 var acoes = []acao{
 	iniciar, concluir, falhar, falharDeVez, liberar, cancelar, resgatar,
+	bater,
 }
 
 var estados = []job.State{
@@ -68,6 +72,7 @@ var especificacao = []struct {
 	{job.StateRunning, falhar, job.StateRetryable},
 	{job.StateRunning, falharDeVez, job.StateDiscarded},
 	{job.StateRunning, resgatar, job.StateAvailable},
+	{job.StateRunning, bater, job.StateRunning},
 	{job.StateRetryable, liberar, job.StateAvailable},
 	{job.StateRetryable, cancelar, job.StateCancelled},
 }

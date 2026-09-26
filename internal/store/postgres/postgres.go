@@ -27,7 +27,7 @@ func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 // da verdade: a causa da última tentativa que falhou.
 const colunas = `job_id::text, namespace, queue, kind, args::text,
 	unique_key, state, priority, attempt, max_attempts, scheduled_at,
-	attempted_at, attempted_by, finalized_at,
+	attempted_at, attempted_by, finalized_at, heartbeat_at,
 	(SELECT e.payload->>'cause' FROM job_event e
 	  WHERE e.job_id = job.job_id AND e.event_type = 6
 	  ORDER BY e.seq DESC LIMIT 1),
@@ -143,6 +143,7 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 		jid, estado, args      string
 		chave, por, ultimoErro *string
 		tentado, finalizado    *time.Time
+		batimento              *time.Time
 		prioridade             int16
 		versao                 int64
 	)
@@ -161,6 +162,7 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 		&tentado,
 		&por,
 		&finalizado,
+		&batimento,
 		&ultimoErro,
 		&versao,
 	)
@@ -180,6 +182,7 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 	j.Priority = int(prioridade)
 	j.ScheduledAt = j.ScheduledAt.UTC()
 	j.AttemptedAt, j.FinalizedAt = utc(tentado), utc(finalizado)
+	j.HeartbeatAt = utc(batimento)
 	return j, versao, nil
 }
 

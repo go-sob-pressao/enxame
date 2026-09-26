@@ -50,11 +50,12 @@ func gravar(
 ) error {
 	tag, err := tx.Exec(ctx, `UPDATE job SET state = $2, attempt = $3,
 		scheduled_at = $4, attempted_at = $5, attempted_by = $6,
-		finalized_at = $7, version = version + 1
+		finalized_at = $7, heartbeat_at = $9, version = version + 1
 		WHERE job_id = $1 AND version = $8`,
 		j.ID.String(), string(j.State), j.Attempt, j.ScheduledAt,
 		instanteNulo(j.AttemptedAt), nulo(j.AttemptedBy),
-		instanteNulo(j.FinalizedAt), version)
+		instanteNulo(j.FinalizedAt), version,
+		instanteNulo(j.HeartbeatAt))
 	if err != nil {
 		return traduzir(err)
 	}

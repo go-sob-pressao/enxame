@@ -34,6 +34,7 @@ type Job struct {
 	ScheduledAt time.Time
 	AttemptedAt time.Time
 	AttemptedBy string
+	HeartbeatAt time.Time // último batimento da tentativa corrente
 	FinalizedAt time.Time
 	LastError   string
 }

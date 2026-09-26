@@ -137,3 +137,22 @@ func TestResgateNaUltimaTentativaDescarta(t *testing.T) {
 		t.Fatalf("depois do resgate da última tentativa: %+v", j)
 	}
 }
+
+// Um batimento atrasado, de uma tentativa que já foi resgatada, não
+// renova a tentativa seguinte.
+func TestBatimentoDeTentativaAntiga(t *testing.T) {
+	j := emEstado(t, job.StateRunning) // tentativa 1
+	evs, err := job.Rescue(j, t0)
+	j = aplicar(t, j, evs, err)
+	evs, err = job.Start(j, t0, "w2") // tentativa 2, outro worker
+	j = aplicar(t, j, evs, err)
+	if _, err := job.Heartbeat(j, t0, 1); !errors.Is(err,
+		job.ErrInvalidTransition) {
+		t.Fatalf("batimento da tentativa 1 aceito: %v", err)
+	}
+	evs, err = job.Heartbeat(j, t0.Add(time.Minute), 2)
+	j = aplicar(t, j, evs, err)
+	if !j.HeartbeatAt.Equal(t0.Add(time.Minute)) {
+		t.Fatalf("HeartbeatAt %v", j.HeartbeatAt)
+	}
+}

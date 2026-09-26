@@ -75,3 +75,12 @@ func (f *Fila) Fail(
 func (f *Fila) Promote(at time.Time) (int, error) {
 	return f.store.Promote(f.ctx, at)
 }
+
+// Heartbeat registra que a tentativa attempt do job continua viva.
+func (f *Fila) Heartbeat(
+	ctx context.Context,
+	jid id.JobID,
+	attempt int,
+) error {
+	return f.store.Heartbeat(ctx, jid, time.Now(), attempt)
+}

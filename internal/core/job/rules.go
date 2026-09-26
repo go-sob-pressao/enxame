@@ -14,6 +14,7 @@ var origens = map[string][]State{
 	"registrar falha":   {StateRunning},
 	"tornar disponível": {StateScheduled, StateRetryable},
 	"resgatar":          {StateRunning},
+	"bater":             {StateRunning},
 	"cancelar": {
 		StateScheduled, StateAvailable, StateRetryable,
 	},

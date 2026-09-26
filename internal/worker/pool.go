@@ -12,6 +12,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/queue"
+	"github.com/go-sob-pressao/enxame/internal/worker/heartbeat"
 	"github.com/go-sob-pressao/enxame/internal/worker/runner"
 	pkgjob "github.com/go-sob-pressao/enxame/pkg/job"
 )
@@ -42,11 +43,15 @@ type Pool struct {
 	RetryDelay     time.Duration
 	// Backoff, se definido, substitui RetryDelay: recebe o número da
 	// tentativa que falhou e devolve a espera até a próxima.
-	Backoff     func(attempt int) time.Duration
-	ReportEvery time.Duration
-	Worker      string
-	Now         func() time.Time
-	Log         *slog.Logger
+	Backoff func(attempt int) time.Duration
+	// Heartbeat, se definido, é chamado a cada HeartbeatEvery enquanto
+	// o handler roda. Um batimento recusado cancela a tentativa.
+	Heartbeat      func(context.Context, id.JobID, int) error
+	HeartbeatEvery time.Duration
+	ReportEvery    time.Duration
+	Worker         string
+	Now            func() time.Time
+	Log            *slog.Logger
 
 	executados, falhas, panicos atomic.Int64
 	rodando                     atomic.Bool
@@ -172,6 +177,15 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 		ErrAttemptTimeout,
 	)
 	defer cancelar()
+	if p.Heartbeat != nil && p.HeartbeatEvery > 0 {
+		var perder context.CancelCauseFunc
+		tentativa, perder = context.WithCancelCause(tentativa)
+		defer perder(nil)
+		go heartbeat.Run(tentativa, p.HeartbeatEvery,
+			func(ctx context.Context) error {
+				return p.Heartbeat(ctx, j.ID, j.Attempt)
+			}, perder)
+	}
 	tentativa = pkgjob.WithInfo(tentativa, pkgjob.Info{
 		ID: j.ID.String(), Kind: j.Kind, Attempt: j.Attempt,
 		MaxAttempts:    j.MaxAttempts,
@@ -189,22 +203,47 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 		err = context.Cause(tentativa)
 	}
 	p.executados.Add(1)
+	if errors.Is(err, heartbeat.ErrPerdida) {
+		return p.perdida(j, err)
+	}
 	if err != nil {
 		p.falhas.Add(1)
 		if _, ok := errors.AsType[*runner.PanicError](err); ok {
 			p.panicos.Add(1)
 		}
 		agora := p.Now()
-		return p.Queue.Fail(
+		return p.registrar(j, p.Queue.Fail(
 			j.ID,
 			agora,
 			err.Error(),
 			errors.Is(err, runner.ErrPermanent),
 			agora.Add(p.espera(j.Attempt)),
-		)
+		))
 	}
-	return p.Queue.Complete(j.ID, p.Now())
+	return p.registrar(j, p.Queue.Complete(j.ID, p.Now()))
 }
+
+// livro:inicio perdida
+
+// registrar trata a recusa do domínio ao registrar o fim da tentativa:
+// o job foi resgatado enquanto esta tentativa rodava, e já pertence a
+// outra. Não é um erro do pool — é o resgate funcionando —, e o pool
+// segue com os outros jobs.
+func (p *Pool) registrar(j job.Job, err error) error {
+	if errors.Is(err, job.ErrInvalidTransition) {
+		return p.perdida(j, err)
+	}
+	return err
+}
+
+func (p *Pool) perdida(j job.Job, err error) error {
+	p.Log.Warn("tentativa perdida",
+		slog.String("job", j.ID.String()),
+		slog.Int("tentativa", j.Attempt), slog.Any("erro", err))
+	return nil
+}
+
+// livro:fim perdida
 
 // relatar registra o progresso periodicamente, até o contexto terminar.
 func (p *Pool) relatar(ctx context.Context) error {
