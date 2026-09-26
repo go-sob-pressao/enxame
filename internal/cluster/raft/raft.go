@@ -73,6 +73,10 @@ type Node struct {
 	snapshot *Snapshot // o último, tirado aqui ou recebido do líder
 	instalar *Snapshot // recebido e ainda não entregue em Ready
 
+	// silencio conta, no líder, os ticks desde a última resposta de
+	// cada membro: é assim que o coordenador sabe quem está vivo.
+	silencio map[NodeID]int
+
 	outbox []Message
 }
 
@@ -96,6 +100,9 @@ type Status struct {
 	Leader    NodeID
 	Commit    Index
 	LastIndex Index
+	// Ativos: no líder, os membros que responderam no último intervalo
+	// de eleição, inclusive ele mesmo. Vazio nos demais papéis.
+	Ativos []NodeID
 }
 
 // Status devolve o estado corrente.
@@ -107,6 +114,13 @@ func (n *Node) Status() Status {
 		Leader:    n.leader,
 		Commit:    n.commit,
 		LastIndex: n.lastIndex(),
+	}
+	if n.state == Leader {
+		for _, p := range n.cfg.Peers {
+			if p == n.cfg.ID || n.silencio[p] < n.cfg.ElectionTicks {
+				st.Ativos = append(st.Ativos, p)
+			}
+		}
 	}
 	return st
 }

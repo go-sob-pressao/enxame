@@ -104,6 +104,7 @@ func (n *Node) handleAppResp(m Message) {
 	if n.state != Leader {
 		return
 	}
+	n.silencio[m.From] = 0
 	if m.Success {
 		n.match[m.From] = max(n.match[m.From], m.Match)
 		n.next[m.From] = n.match[m.From] + 1

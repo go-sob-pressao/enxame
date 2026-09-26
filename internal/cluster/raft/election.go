@@ -7,6 +7,9 @@ package raft
 func (n *Node) Tick() {
 	if n.state == Leader {
 		n.heartbeatElapsed++
+		for _, p := range n.others() {
+			n.silencio[p]++
+		}
 		if n.heartbeatElapsed >= n.cfg.HeartbeatTicks {
 			n.heartbeatElapsed = 0
 			n.broadcastAppend()
@@ -70,6 +73,7 @@ func (n *Node) becomeLeader() {
 	n.state, n.leader = Leader, n.cfg.ID
 	n.heartbeatElapsed = 0
 	n.next, n.match = map[NodeID]Index{}, map[NodeID]Index{}
+	n.silencio = map[NodeID]int{}
 	for _, p := range n.cfg.Peers {
 		n.next[p], n.match[p] = n.lastIndex()+1, 0
 	}
