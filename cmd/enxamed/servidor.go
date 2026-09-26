@@ -3,15 +3,19 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
+	"github.com/go-sob-pressao/enxame/internal/cluster/coordinator"
+	"github.com/go-sob-pressao/enxame/internal/cluster/membership"
 	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/delivery"
@@ -32,6 +36,7 @@ type config struct {
 	resgate         time.Duration
 	taxa, rajada    float64
 	emCurso, naFila int
+	no              string
 }
 
 // livro:inicio servir
@@ -57,7 +62,12 @@ func servir(
 	s := postgres.New(db)
 	g, ctx := errgroup.WithContext(ctx)
 
+	m := membership.Novo(membership.Config{No: nomeDoNo(c.no),
+		Endereco: lisHTTP.Addr().String(), DB: db, Log: log})
+	g.Go(func() error { return m.Run(ctx) })
+
 	a := api.NovaAPI(db, c.tokens, log)
+	a.Cluster = m
 	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
 	a.Fila = api.Fila{Max: c.naFila, Validade: time.Second}
 	g.Go(func() error {
@@ -91,6 +101,15 @@ func servir(
 }
 
 // livro:fim servir
+
+// nomeDoNo usa o nome dado, ou máquina-pid.
+func nomeDoNo(nome string) coordinator.NodeID {
+	if nome != "" {
+		return coordinator.NodeID(nome)
+	}
+	h, _ := os.Hostname()
+	return coordinator.NodeID(fmt.Sprintf("%s-%d", h, os.Getpid()))
+}
 
 // pararGRPC espera os streams terminarem; se não terminarem no prazo,
 // fecha tudo. Um stream de long-poll só termina quando o worker desiste

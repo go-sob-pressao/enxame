@@ -19,13 +19,19 @@ type Assignment struct {
 	Owners []NodeID
 }
 
+// Membership responde quem está no cluster, na visão deste nó: ele
+// mesmo e os que ele não dá por mortos.
+type Membership interface {
+	Members(ctx context.Context) ([]NodeID, error)
+}
+
 // Coordinator responde, a qualquer momento: quem é o líder, quem está
 // no cluster e de quem é cada partição. Declarado aqui, no consumidor;
 // as implementações (pgcoord, raftcoord) não são conhecidas por este
 // pacote.
 type Coordinator interface {
+	Membership
 	Leader(ctx context.Context) (NodeID, error)
-	Members(ctx context.Context) ([]NodeID, error)
 	Assignment(ctx context.Context) (Assignment, error)
 	Close() error
 }

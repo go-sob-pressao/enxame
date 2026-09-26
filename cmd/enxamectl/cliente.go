@@ -23,11 +23,26 @@ type cliente struct {
 // chamar faz a requisição e imprime a resposta formatada. Um status de
 // erro vira erro, com a mensagem que a API mandou.
 func (c *cliente) chamar(metodo, caminho string, corpo any) error {
+	b, err := c.fazer(metodo, caminho, corpo)
+	if err != nil || len(b) == 0 {
+		return err
+	}
+	v := jsontext.Value(b)
+	if err := v.Indent(); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(c.saida, string(v))
+	return err
+}
+
+// fazer faz a requisição e devolve o corpo da resposta.
+func (c *cliente) fazer(metodo, caminho string, corpo any) ([]byte,
+	error) {
 	var r io.Reader
 	if corpo != nil {
 		b, err := json.Marshal(corpo)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		r = bytes.NewReader(b)
 	}
@@ -37,35 +52,27 @@ func (c *cliente) chamar(metodo, caminho string, corpo any) error {
 	req, err := http.NewRequestWithContext(ctx, metodo,
 		c.api+caminho, r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode >= 400 {
 		var e struct {
 			Message string `json:"message"`
 		}
 		_ = json.Unmarshal(b, &e)
-		return fmt.Errorf("%s: %s", resp.Status, e.Message)
+		return nil, fmt.Errorf("%s: %s", resp.Status, e.Message)
 	}
-	if len(b) == 0 {
-		return nil
-	}
-	v := jsontext.Value(b)
-	if err := v.Indent(); err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(c.saida, string(v))
-	return err
+	return b, nil
 }
 
 // novoFlagSet cria o FlagSet de um subcomando, que não imprime nada
