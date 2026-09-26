@@ -41,27 +41,28 @@ type Checkout struct {
 	Reservar func(ctx context.Context, tx pgx.Tx) error
 }
 
-// livro:inicio missao-03
+// livro:inicio missao-03-gabarito
 
-// Finalizar registra o pedido, reserva o estoque e agenda a cobrança.
-// Se devolver erro, o cliente chama de novo com o mesmo pedido.
+// Finalizar registra o pedido, reserva o estoque e agenda a cobrança,
+// numa transação só: se a reserva falhar, o ROLLBACK leva o pedido e a
+// cobrança juntos, e a nova tentativa do cliente começa do zero.
 func (c *Checkout) Finalizar(
 	ctx context.Context,
 	pedidoID string,
 	valor int,
 ) error {
-	if _, err := c.Enxame.Insert(ctx,
-		Cobrar{PedidoID: pedidoID, Valor: valor}); err != nil {
-		return err
-	}
 	return pgx.BeginFunc(ctx, c.DB, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `INSERT INTO pedido (id, valor)
 			VALUES ($1, $2)`, pedidoID, valor)
 		if err != nil {
 			return err
 		}
+		if _, err := c.Enxame.InsertTx(ctx, tx,
+			Cobrar{PedidoID: pedidoID, Valor: valor}); err != nil {
+			return err
+		}
 		return c.Reservar(ctx, tx)
 	})
 }
 
-// livro:fim missao-03
+// livro:fim missao-03-gabarito
