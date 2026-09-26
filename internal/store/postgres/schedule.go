@@ -41,7 +41,7 @@ func (s *Store) FireDue(
 	decidir func(schedule.Schedule, time.Time) (
 		job.Spec, time.Time, error),
 ) (disparados, absorvidos int, err error) {
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err = s.transacao(ctx, func(tx pgx.Tx) error {
 		vencidos, err := vencidos(ctx, tx, now)
 		if err != nil {
 			return err

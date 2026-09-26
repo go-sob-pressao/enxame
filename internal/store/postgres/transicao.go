@@ -29,7 +29,7 @@ func (s *Store) AppendStep(
 	r workflow.Record,
 	next workflow.Continuation,
 ) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	return s.transacao(ctx, func(tx pgx.Tx) error {
 		var namespace string
 		err := tx.QueryRow(ctx, `UPDATE workflow_run
 			SET next_step_seq = $2 + 1, version = version + 1

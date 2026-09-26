@@ -26,7 +26,11 @@ func (s *Store) Claim(
 ) (job.Job, bool, error) {
 	var reservado job.Job
 	achou := false
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	at, err := s.instante(ctx, at)
+	if err != nil {
+		return job.Job{}, false, err
+	}
+	err = s.transacao(ctx, func(tx pgx.Tx) error {
 		j, v, err := ler(tx.QueryRow(ctx, `SELECT `+colunas+` FROM job
 			WHERE partition_id = 0 AND queue = $1
 			  AND state = 'available'
@@ -61,7 +65,7 @@ func (s *Store) Decide(
 	decidir func(job.Job) ([]job.Event, error),
 ) (job.Job, error) {
 	var novo job.Job
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err := s.transacao(ctx, func(tx pgx.Tx) error {
 		j, v, err := ler(tx.QueryRow(ctx,
 			`SELECT `+colunas+` FROM job WHERE job_id = $1 FOR UPDATE`,
 			jid.String()))
@@ -86,6 +90,10 @@ func (s *Store) Promote(
 	ctx context.Context,
 	at time.Time,
 ) (int, error) {
+	at, err := s.instante(ctx, at)
+	if err != nil {
+		return 0, err
+	}
 	return s.emLote(ctx, `partition_id = 0
 		AND state IN ('scheduled', 'retryable')
 		AND scheduled_at <= $1`, at,
@@ -101,7 +109,11 @@ func (s *Store) Heartbeat(
 	at time.Time,
 	attempt int,
 ) error {
-	_, err := s.Decide(ctx, jid, func(j job.Job) ([]job.Event, error) {
+	at, err := s.instante(ctx, at)
+	if err != nil {
+		return err
+	}
+	_, err = s.Decide(ctx, jid, func(j job.Job) ([]job.Event, error) {
 		return job.Heartbeat(j, at, attempt)
 	})
 	return err
@@ -118,6 +130,13 @@ func (s *Store) Rescue(
 	ctx context.Context,
 	at, desde time.Time,
 ) (int, error) {
+	agora, err := s.instante(ctx, at)
+	if err != nil {
+		return 0, err
+	}
+	// O prazo é o que o chamador pediu; o instante, o do relógio que
+	// vale.
+	at, desde = agora, agora.Add(-at.Sub(desde))
 	return s.emLote(ctx, `partition_id = 0 AND state = 'running'
 		AND coalesce(heartbeat_at, attempted_at) < $1`,
 		desde, func(j job.Job) ([]job.Event, error) {
@@ -136,7 +155,7 @@ func (s *Store) emLote(
 	decidir func(job.Job) ([]job.Event, error),
 ) (int, error) {
 	n := 0
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err := s.transacao(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT `+colunas+` FROM job
 			WHERE `+onde+` ORDER BY job_id LIMIT 100
 			FOR UPDATE SKIP LOCKED`, arg)

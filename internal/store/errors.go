@@ -13,4 +13,8 @@ var (
 	// ErrConflict: a versão gravada não é a esperada; alguém escreveu
 	// antes (lock otimista).
 	ErrConflict = errors.New("versão desatualizada")
+	// ErrCercado: a partição tem outro dono; o fencing token que este
+	// nó carrega é antigo, e a transação foi desfeita.
+	ErrCercado = errors.New(
+		"partição com outro dono (fencing token antigo)")
 )

@@ -17,8 +17,12 @@ import (
 )
 
 // Store guarda jobs no PostgreSQL, no esquema das migrações 0002 e
-// 0003. Por enquanto, tudo na partição 0 (particionamento: Parte V).
-type Store struct{ pool *pgxpool.Pool }
+// 0003. Por enquanto, tudo na partição 0 (particionamento: Cap. 26).
+type Store struct {
+	pool  *pgxpool.Pool
+	cerca *Cerca // nil: sem fencing (ver ComCerca)
+	banco bool   // instantes do relógio do banco (ver RelogioDoBanco)
+}
 
 // New usa o pool dado; quem o criou é quem o fecha.
 func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
