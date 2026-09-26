@@ -41,7 +41,7 @@ func (a *API) OpenAPI(versao string) ([]byte, error) {
 		}
 		caminhos[caminho][strings.ToLower(metodo)] = op
 	}
-	g.esquemas["Erro"] = g.esquema(reflect.TypeOf(Erro{}))
+	g.esquemas["Erro"] = g.esquema(reflect.TypeFor[Erro]())
 	return json.Marshal(map[string]any{
 		"openapi": "3.1.0",
 		"info": map[string]any{"title": "Enxame API",
@@ -57,8 +57,8 @@ func (a *API) OpenAPI(versao string) ([]byte, error) {
 
 type gerador struct{ esquemas map[string]any }
 
-var tipoTempo = reflect.TypeOf(time.Time{})
-var tipoValor = reflect.TypeOf(jsontext.Value{})
+var tipoTempo = reflect.TypeFor[time.Time]()
+var tipoValor = reflect.TypeFor[jsontext.Value]()
 var naoAlfa = regexp.MustCompile(`[^A-Za-z0-9]`)
 
 func nome(t reflect.Type) string {
@@ -80,10 +80,10 @@ func (g *gerador) ref(t reflect.Type) map[string]any {
 }
 
 func (g *gerador) esquema(t reflect.Type) map[string]any {
-	switch {
-	case t == tipoTempo:
+	switch t {
+	case tipoTempo:
 		return map[string]any{"type": "string", "format": "date-time"}
-	case t == tipoValor:
+	case tipoValor:
 		return map[string]any{} // qualquer JSON
 	}
 	switch t.Kind() {
@@ -101,8 +101,7 @@ func (g *gerador) esquema(t reflect.Type) map[string]any {
 			"additionalProperties": g.esquema(t.Elem())}
 	case reflect.Struct:
 		props, obrig := map[string]any{}, []string{}
-		for i := range t.NumField() {
-			f := t.Field(i)
+		for f := range t.Fields() {
 			tag, opcoes, _ := strings.Cut(f.Tag.Get("json"), ",")
 			if !f.IsExported() || tag == "-" {
 				continue
