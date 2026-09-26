@@ -4,6 +4,7 @@ go 1.27.0
 
 require (
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1
 	go.uber.org/goleak v1.3.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/tools v0.50.0
