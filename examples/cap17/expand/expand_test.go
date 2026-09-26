@@ -9,12 +9,13 @@ import (
 
 // livro:inicio tres-deploys
 
-// Os três deploys, em ordem, com o código de cada fase rodando ao lado
-// do da fase anterior.
+// Os três deploys, em ordem, com o código de cada fase rodando ao
+// lado do da fase anterior.
 func TestTresDeploys(t *testing.T) {
 	db := testutil.Postgres(t)
 	ctx := t.Context()
-	v1, v2, v3 := expand.V1{DB: db}, expand.V2{DB: db}, expand.V3{DB: db}
+	v1, v2 := expand.V1{DB: db}, expand.V2{DB: db}
+	v3 := expand.V3{DB: db}
 	passo := func(err error) {
 		t.Helper()
 		if err != nil {
