@@ -56,6 +56,12 @@ func executar(args []string, saida, erros io.Writer) int {
 		"teto para drenar as requisições no desligamento")
 	fs.DurationVar(&c.resgate, "resgate", time.Minute,
 		"prazo sem sinal de vida antes de resgatar uma tentativa")
+	fs.Float64Var(&c.taxa, "taxa", 0,
+		"requisições por segundo por namespace (0: sem limite)")
+	fs.Float64Var(&c.rajada, "rajada", 0,
+		"rajada por namespace acima da taxa")
+	fs.IntVar(&c.emCurso, "max-em-curso", 32,
+		"requisições em curso antes de responder 503 (0: sem limite)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}

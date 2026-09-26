@@ -36,6 +36,9 @@ func (a *API) OpenAPI(versao string) ([]byte, error) {
 			resp["content"] = corpo(g.ref(reflect.TypeOf(r.Saida)))
 		}
 		op["responses"].(map[string]any)[itoa(r.Status)] = resp
+		if !r.Publica {
+			g.recusas(op["responses"].(map[string]any))
+		}
 		if caminhos[caminho] == nil {
 			caminhos[caminho] = map[string]any{}
 		}
@@ -56,6 +59,22 @@ func (a *API) OpenAPI(versao string) ([]byte, error) {
 // livro:fim openapi
 
 type gerador struct{ esquemas map[string]any }
+
+// recusas documenta as respostas de toda rota autenticada que não vêm
+// do handler: token inválido, taxa excedida e servidor sobrecarregado.
+// As duas últimas dizem quando voltar.
+func (g *gerador) recusas(respostas map[string]any) {
+	for _, s := range []int{401, 429, 503} {
+		r := map[string]any{"description": http.StatusText(s),
+			"content": corpo(g.ref(reflect.TypeFor[Erro]()))}
+		if s != 401 {
+			r["headers"] = map[string]any{"Retry-After": map[string]any{
+				"description": "segundos até tentar de novo",
+				"schema":      map[string]any{"type": "integer"}}}
+		}
+		respostas[itoa(s)] = r
+	}
+}
 
 var tipoTempo = reflect.TypeFor[time.Time]()
 var tipoValor = reflect.TypeFor[jsontext.Value]()

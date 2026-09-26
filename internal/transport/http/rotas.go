@@ -57,10 +57,11 @@ func (a *API) Rotas() []Rota {
 // Handler monta o ServeMux a partir da tabela, com os middlewares.
 func (a *API) Handler() http.Handler {
 	mux := http.NewServeMux()
+	protecao := a.protecao()
 	for _, r := range a.Rotas() {
 		var h http.Handler = r.handler
 		if !r.Publica {
-			h = Encadear(h, a.Autenticar, LimitarCorpo(1<<20))
+			h = Encadear(h, protecao...)
 		}
 		h = anotarRota(h)
 		mux.Handle(r.Padrao, h)
@@ -70,3 +71,43 @@ func (a *API) Handler() http.Handler {
 }
 
 // livro:fim rotas
+
+// livro:inicio protecao
+
+// protecao é a cadeia das rotas autenticadas, montada uma vez: o
+// limite de requisições em curso é do processo, não de cada rota. O
+// descarte vem antes de tudo — recusar por excesso não pode custar a
+// verificação do token —, e o long-poll fica fora dele: passa quase
+// todo o tempo parado, e ocuparia uma vaga por até um minuto.
+func (a *API) protecao() []Middleware {
+	var ms []Middleware
+	if a.MaxEmCurso > 0 {
+		ms = append(ms, exceto(emEspera, Descartar(a.MaxEmCurso)))
+	}
+	ms = append(ms, a.Autenticar)
+	if a.Taxa > 0 {
+		ms = append(ms, Limitar(a.Taxa, max(a.Rajada, 1)))
+	}
+	return append(ms, LimitarCorpo(1<<20))
+}
+
+// livro:fim protecao
+
+// exceto aplica m só às requisições em que pula(r) é falso.
+func exceto(pula func(*http.Request) bool, m Middleware) Middleware {
+	return func(prox http.Handler) http.Handler {
+		com := m(prox)
+		return http.HandlerFunc(func(w http.ResponseWriter,
+			r *http.Request) {
+			if pula(r) {
+				prox.ServeHTTP(w, r)
+				return
+			}
+			com.ServeHTTP(w, r)
+		})
+	}
+}
+
+func emEspera(r *http.Request) bool {
+	return r.URL.Query().Has("wait")
+}

@@ -30,6 +30,8 @@ type config struct {
 	tokenWorker     string
 	aviso, prazo    time.Duration
 	resgate         time.Duration
+	taxa, rajada    float64
+	emCurso         int
 }
 
 // livro:inicio servir
@@ -56,6 +58,7 @@ func servir(
 	g, ctx := errgroup.WithContext(ctx)
 
 	a := api.NovaAPI(db, c.tokens, log)
+	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
 	g.Go(func() error {
 		return a.Servir(ctx, lisHTTP,
 			api.Desligamento{Aviso: c.aviso, Prazo: c.prazo})

@@ -24,6 +24,10 @@ type API struct {
 	Store  *postgres.Store
 	Tokens map[string]string // token → namespace
 	Log    *slog.Logger
+	// Taxa e Rajada limitam cada namespace; MaxEmCurso limita as
+	// requisições em curso no processo. Zero desliga cada um.
+	Taxa, Rajada float64
+	MaxEmCurso   int
 	// encerrando é fechado quando o servidor começa a desligar: os
 	// long-polls param de esperar.
 	encerrando chan struct{}
@@ -63,6 +67,9 @@ var erroHTTP = []struct {
 	{webhook.ErrInvalido, http.StatusBadRequest, "invalid"},
 	{errEntrada, http.StatusBadRequest, "invalid"},
 	{context.DeadlineExceeded, http.StatusGatewayTimeout, "timeout"},
+	// O cliente desistiu: ninguém vai ler a resposta, e não é defeito
+	// do servidor. 499 é a convenção do nginx para o caso.
+	{context.Canceled, 499, "canceled"},
 }
 
 var errEntrada = errors.New("entrada inválida")
