@@ -6,44 +6,59 @@ import (
 	"slices"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/go-sob-pressao/enxame/internal/cluster/coordinator"
 	"github.com/go-sob-pressao/enxame/internal/engine/partition"
+	"github.com/go-sob-pressao/enxame/internal/simulation/clock"
 )
+
+// Posse é o que o rebalanceador usa do lease das partições. Em
+// produção, partition.Lease, sobre o banco; na simulação, o modelo do
+// banco simulado.
+type Posse interface {
+	AdquirirVarias(ctx context.Context, ps []int) (map[int]int64, error)
+	RenovarVarias(ctx context.Context,
+		posses map[int]int64) (map[int]int64, error)
+	Soltar(ctx context.Context, p int, token int64) error
+}
+
+// EmCurso conta, para cada partição de ps, as tentativas em execução.
+type EmCurso func(ctx context.Context, ps []int) (map[int]int, error)
 
 // Rebalanceador faz as posses deste nó acompanharem o mapa do
 // coordenador: larga, depois de drenar, o que o mapa tirou dele, e
-// adquire o que o mapa deu.
+// adquire o que o mapa deu. Não cria goroutine nenhuma: cada Passo faz
+// o que cabe naquele instante, e quem chama Passo decide quando — um
+// ticker em produção, o escalonador na simulação.
 type Rebalanceador struct {
 	No        coordinator.NodeID
 	Coord     coordinator.Coordinator
-	Lease     partition.Lease
+	Lease     Posse
 	Posses    *partition.Posses
-	DB        *pgxpool.Pool
+	EmCurso   EmCurso
+	Relogio   clock.Clock   // nil: o relógio do sistema
 	Intervalo time.Duration // renovação e leitura do mapa (1 s)
 	Drenagem  time.Duration // teto para esperar as tentativas (30 s)
 	Espera    time.Duration // quanto insistir na aquisição (2 s)
 	Log       *slog.Logger
 
-	epoca uint64
+	epoca    uint64
+	proxima  time.Time        // próxima renovação e leitura do mapa
+	faltam   []int            // partições do mapa ainda sem posse
+	desistir time.Time        // quando parar de insistir nelas
+	drenando map[int]drenagem // partições saindo, à espera de soltar
 }
 
-// livro:inicio rebalancear
+type drenagem struct {
+	token  int64
+	limite time.Time
+}
 
-// Run renova as posses e segue o mapa, a cada intervalo, até ctx
-// terminar.
+// Run chama Passo cinco vezes por intervalo, até ctx terminar.
 func (r *Rebalanceador) Run(ctx context.Context) error {
-	t := time.NewTicker(r.Intervalo)
+	t := time.NewTicker(r.Intervalo / 5)
 	defer t.Stop()
 	for {
-		r.renovar(ctx)
-		a, err := r.Coord.Assignment(ctx)
-		if err == nil && a.Epoch > r.epoca &&
-			len(a.Owners) == coordinator.NumPartitions {
-			r.aplicar(ctx, a)
-			r.epoca = a.Epoch
-		}
+		r.Passo(ctx)
 		select {
 		case <-ctx.Done():
 			return nil
@@ -52,15 +67,35 @@ func (r *Rebalanceador) Run(ctx context.Context) error {
 	}
 }
 
+// livro:inicio rebalancear
+
+// Passo renova as posses e lê o mapa, uma vez por intervalo; e, a cada
+// chamada, solta as partições drenadas e tenta adquirir as que faltam.
+func (r *Rebalanceador) Passo(ctx context.Context) {
+	agora := r.agora()
+	if !agora.Before(r.proxima) {
+		r.proxima = agora.Add(r.Intervalo)
+		r.renovar(ctx)
+		a, err := r.Coord.Assignment(ctx)
+		if err == nil && a.Epoch > r.epoca &&
+			len(a.Owners) == coordinator.NumPartitions {
+			r.aplicar(a, agora)
+			r.epoca = a.Epoch
+		}
+	}
+	r.soltarDrenadas(ctx, agora)
+	r.adquirir(ctx, agora)
+}
+
 // aplicar leva as posses ao mapa a, em três fases. Drenar: as partições
-// que saem deixam de receber trabalho novo, e cada uma espera, numa
-// goroutine própria, as tentativas em curso terminarem. Liberar: só
-// então o lease é devolvido, e o próximo dono não precisa esperar o
-// vencimento. Adquirir: as partições que entram são tomadas assim que o
-// dono anterior as libera.
+// que saem deixam de receber trabalho novo, e cada uma espera as
+// tentativas em curso terminarem. Liberar: só então o lease é
+// devolvido, e o próximo dono não precisa esperar o vencimento.
+// Adquirir: as partições que entram são tomadas assim que o dono
+// anterior as libera.
 func (r *Rebalanceador) aplicar(
-	ctx context.Context,
 	a coordinator.Assignment,
+	agora time.Time,
 ) {
 	meus := map[int]bool{}
 	for p, dono := range a.Owners {
@@ -71,68 +106,81 @@ func (r *Rebalanceador) aplicar(
 	for p := range r.Posses.Tokens() {
 		if !meus[p] {
 			if token, ok := r.Posses.Drenar(p); ok {
-				go r.drenarELiberar(ctx, p, token)
+				r.drenar(p, token, agora)
 			}
 		}
 	}
-	var faltam []int
+	r.faltam = nil
 	todas := r.Posses.Todas()
 	for p := range meus {
 		if _, tem := todas[p]; !tem {
-			faltam = append(faltam, p)
+			r.faltam = append(r.faltam, p)
 		}
 	}
-	r.adquirir(ctx, faltam)
+	r.desistir = agora.Add(r.Espera)
 }
 
 // adquirir insiste nas partições que faltam por até Espera: a drenagem
 // do dono anterior costuma levar menos que isso.
-func (r *Rebalanceador) adquirir(ctx context.Context, faltam []int) {
-	limite := time.Now().Add(r.Espera)
-	for len(faltam) > 0 && time.Now().Before(limite) &&
-		ctx.Err() == nil {
-		ganhas, err := r.Lease.AdquirirVarias(ctx, faltam)
-		if err == nil {
-			for p, token := range ganhas {
-				r.Posses.Pegar(p, token)
-			}
-			faltam = slices.DeleteFunc(faltam, func(p int) bool {
-				_, ok := ganhas[p]
-				return ok
-			})
-		}
-		if len(faltam) > 0 {
-			<-time.After(r.Intervalo / 5)
-		}
+func (r *Rebalanceador) adquirir(ctx context.Context, agora time.Time) {
+	if len(r.faltam) == 0 {
+		return
 	}
-	if len(faltam) > 0 {
+	if agora.After(r.desistir) {
 		r.Log.WarnContext(ctx, "partições não adquiridas",
-			slog.Int("quantas", len(faltam)))
+			slog.Int("quantas", len(r.faltam)))
+		r.faltam = nil
+		return
 	}
+	ganhas, err := r.Lease.AdquirirVarias(ctx, r.faltam)
+	if err != nil {
+		return
+	}
+	for p, token := range ganhas {
+		r.Posses.Pegar(p, token)
+	}
+	r.faltam = slices.DeleteFunc(r.faltam, func(p int) bool {
+		_, ok := ganhas[p]
+		return ok
+	})
 }
 
 // livro:fim rebalancear
 
-// drenarELiberar espera as tentativas em curso na partição terminarem
-// — ou a Drenagem vencer — e devolve o lease.
-func (r *Rebalanceador) drenarELiberar(
-	ctx context.Context,
-	p int,
-	token int64,
-) {
-	limite := time.Now().Add(r.Drenagem)
-	for time.Now().Before(limite) && ctx.Err() == nil {
-		var emCurso int
-		err := r.DB.QueryRow(ctx, `SELECT count(*) FROM job
-			WHERE partition_id = $1 AND state = 'running'`, p).
-			Scan(&emCurso)
-		if err == nil && emCurso == 0 {
-			break
-		}
-		<-time.After(r.Intervalo / 5)
+func (r *Rebalanceador) drenar(p int, token int64, agora time.Time) {
+	if r.drenando == nil {
+		r.drenando = map[int]drenagem{}
 	}
-	_ = r.Lease.Soltar(context.WithoutCancel(ctx), p, token)
-	r.Posses.Largar(p)
+	r.drenando[p] = drenagem{token: token,
+		limite: agora.Add(r.Drenagem)}
+}
+
+// soltarDrenadas devolve o lease das partições em drenagem que não têm
+// mais tentativas em curso — ou cuja Drenagem venceu.
+func (r *Rebalanceador) soltarDrenadas(
+	ctx context.Context,
+	agora time.Time,
+) {
+	if len(r.drenando) == 0 {
+		return
+	}
+	ps := make([]int, 0, len(r.drenando))
+	for p := range r.drenando {
+		ps = append(ps, p)
+	}
+	emCurso, err := r.EmCurso(ctx, ps)
+	if err != nil {
+		return
+	}
+	for _, p := range ps {
+		d := r.drenando[p]
+		if emCurso[p] > 0 && agora.Before(d.limite) {
+			continue
+		}
+		_ = r.Lease.Soltar(context.WithoutCancel(ctx), p, d.token)
+		r.Posses.Largar(p)
+		delete(r.drenando, p)
+	}
 }
 
 // renovar estende todas as posses; as que o banco não renovou foram
@@ -149,6 +197,14 @@ func (r *Rebalanceador) renovar(ctx context.Context) {
 	for p := range todas {
 		if _, ok := mantidas[p]; !ok {
 			r.Posses.Largar(p)
+			delete(r.drenando, p)
 		}
 	}
+}
+
+func (r *Rebalanceador) agora() time.Time {
+	if r.Relogio == nil {
+		return time.Now()
+	}
+	return r.Relogio.Now()
 }

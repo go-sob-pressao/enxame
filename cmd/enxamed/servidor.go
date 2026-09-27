@@ -82,7 +82,8 @@ func servir(
 		Lease: 3 * time.Second, Log: log})
 	defer func() { _ = coord.Close() }()
 	posses := &partition.Posses{}
-	reb := &sharding.Rebalanceador{No: no, Coord: coord, DB: db,
+	reb := &sharding.Rebalanceador{No: no, Coord: coord,
+		EmCurso: sharding.EmCursoNoBanco(db),
 		Lease: partition.Lease{DB: db, No: string(no),
 			Duracao: c.leaseMotor},
 		Posses: posses, Intervalo: time.Second,
