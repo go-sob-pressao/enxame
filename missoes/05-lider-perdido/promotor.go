@@ -10,7 +10,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 )
 
-// livro:inicio missao-05
+// livro:inicio missao-05-gabarito
 
 // Promotor torna disponíveis os jobs agendados das partições do nó.
 // Para não varrer a tabela inteira a cada passada, cada partição tem
@@ -29,10 +29,10 @@ func (p *Promotor) Passar(ctx context.Context, agora time.Time) error {
 		p.marca = map[int]time.Time{}
 	}
 	for part, token := range p.Posses.Tokens() {
-		desde, ok := p.marca[part]
-		if !ok {
-			desde = agora // partição nova: começa a contar daqui
-		}
+		// Uma partição recém-adquirida pode ter jobs que venceram
+		// enquanto ela não tinha dono: a marca de uma partição nova
+		// começa no início dos tempos, e não na aquisição.
+		desde := p.marca[part]
 		s := p.Store.ComCerca(postgres.Cerca{Particao: part,
 			RangeID: token})
 		ids, err := s.Vencidos(ctx, part, desde, agora)
@@ -49,7 +49,7 @@ func (p *Promotor) Passar(ctx context.Context, agora time.Time) error {
 	return nil
 }
 
-// livro:fim missao-05
+// livro:fim missao-05-gabarito
 
 func promover(ctx context.Context, s *postgres.Store, jid id.JobID,
 	agora time.Time) error {
