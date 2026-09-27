@@ -17,6 +17,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/cluster/coordinator"
 	"github.com/go-sob-pressao/enxame/internal/cluster/membership"
 	"github.com/go-sob-pressao/enxame/internal/cluster/pgcoord"
+	"github.com/go-sob-pressao/enxame/internal/cluster/routing"
 	"github.com/go-sob-pressao/enxame/internal/cluster/sharding"
 	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
@@ -69,7 +70,7 @@ func servir(
 	no := nomeDoNo(c.no)
 
 	m := membership.Novo(membership.Config{No: no,
-		Endereco: lisHTTP.Addr().String(), DB: db, Log: log})
+		Endereco: anunciado(lisHTTP.Addr()), DB: db, Log: log})
 	g.Go(func() error { return m.Run(ctx) })
 
 	// Quem manda e de quem é cada partição (Caps. 23 a 26): o pgcoord
@@ -90,8 +91,22 @@ func servir(
 	sd := s.ComDono(postgres.Dono{Tokens: posses.Tokens,
 		Perdeu: posses.Largar})
 
+	d := delivery.Novo(sd)
 	a := api.NovaAPI(db, c.tokens, log)
-	a.Cluster = m
+	a.Cluster, a.Entrega = m, d
+	a.Rota = routing.Rota{No: no, Coord: coord,
+		Tenho: func(p int) bool {
+			_, ok := posses.Tokens()[p]
+			return ok
+		},
+		Endereco: func(n coordinator.NodeID) string {
+			for _, s := range m.Visao() {
+				if s.No == n {
+					return s.Endereco
+				}
+			}
+			return ""
+		}}
 	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
 	a.Fila = api.Fila{Max: c.naFila, Validade: time.Second}
 	g.Go(func() error {
@@ -116,7 +131,7 @@ func servir(
 	g.Go(func() error {
 		return motor(ctx, sd, coord, no, c.resgate, log)
 	})
-	g.Go(func() error { return entregar(ctx, sd, log) })
+	g.Go(func() error { return entregar(ctx, sd, d, log) })
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
 		slog.String("grpc", lisGRPC.Addr().String()))
@@ -127,6 +142,16 @@ func servir(
 }
 
 // livro:fim servir
+
+// anunciado é o endereço que os outros nós e os clientes usam: sem
+// host, o da máquina local.
+func anunciado(a net.Addr) string {
+	host, porta, err := net.SplitHostPort(a.String())
+	if err != nil || host == "" || host == "::" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, porta)
+}
 
 // nomeDoNo usa o nome dado, ou máquina-pid.
 func nomeDoNo(nome string) coordinator.NodeID {
@@ -216,9 +241,9 @@ func avisar(
 func entregar(
 	ctx context.Context,
 	s *postgres.Store,
+	d *delivery.Entregador,
 	log *slog.Logger,
 ) error {
-	d := delivery.Novo(s)
 	retry := policy.Retry{Base: 30 * time.Second, Max: time.Hour}
 	p := &worker.Pool{Queue: postgres.NewFila(ctx, s),
 		QueueName: webhook.FanoutQueue, Concurrency: 16,

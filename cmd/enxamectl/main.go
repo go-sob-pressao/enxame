@@ -12,6 +12,7 @@
 //	    --events pedido.pago --secret-ref env:SEGREDO
 //	enxamectl webhook endpoint list
 //	enxamectl webhook endpoint remove --id 0199…
+//	enxamectl webhook endpoint state --id 0199…
 //	enxamectl cluster members
 //
 // A API vem de ENXAME_API (padrão http://localhost:8080); o token, de
@@ -46,6 +47,7 @@ var comandos = map[string]comando{
 	"webhook endpoint add":    endpointAdd,
 	"webhook endpoint list":   endpointList,
 	"webhook endpoint remove": endpointRemove,
+	"webhook endpoint state":  endpointState,
 	"cluster members":         clusterMembers,
 }
 

@@ -110,3 +110,51 @@ func obrigatorio(fs *flag.FlagSet, nomes ...string) error {
 	}
 	return nil
 }
+
+// resposta é o que a CLI guarda de uma resposta: o corpo já lido.
+type resposta struct {
+	status int
+	header http.Header
+	corpo  []byte
+}
+
+// pedir faz um GET a outro nó, com a época do mapa no cabeçalho.
+func (c *cliente) pedir(api, caminho, epoca string) (resposta, error) {
+	ctx, cancel := context.WithTimeout(context.Background(),
+		30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		api+caminho, nil)
+	if err != nil {
+		return resposta{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	if epoca != "" {
+		req.Header.Set("Enxame-Epoca", epoca)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return resposta{}, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	return resposta{resp.StatusCode, resp.Header, b}, err
+}
+
+// mostrar imprime a resposta, ou devolve o erro dela.
+func (c *cliente) mostrar(r resposta) error {
+	if r.status >= 400 {
+		var e struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(r.corpo, &e)
+		return fmt.Errorf("%s: %s", http.StatusText(r.status),
+			e.Message)
+	}
+	v := jsontext.Value(r.corpo)
+	if err := v.Indent(); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintln(c.saida, string(v))
+	return err
+}

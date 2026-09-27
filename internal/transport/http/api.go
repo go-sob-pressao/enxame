@@ -29,7 +29,9 @@ type API struct {
 	Taxa, Rajada float64
 	MaxEmCurso   int
 	Fila         Fila
-	Cluster      Cluster // nil com um nó só
+	Cluster      Cluster  // nil com um nó só
+	Rota         Roteador // nil com um nó só
+	Entrega      Entrega  // o estado em memória da entrega
 	// encerrando é fechado quando o servidor começa a desligar: os
 	// long-polls param de esperar.
 	encerrando chan struct{}

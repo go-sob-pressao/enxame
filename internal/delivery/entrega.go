@@ -283,3 +283,9 @@ func retryAfter(h http.Header, agora time.Time) time.Duration {
 	}
 	return 0
 }
+
+// EstadoDoEndpoint é o estado do breaker do endpoint neste nó. Só o
+// dono da partição do endpoint entrega para ele, e só o dele vale.
+func (d *Entregador) EstadoDoEndpoint(id string) string {
+	return d.Breakers.Estado(id, d.Now()).String()
+}

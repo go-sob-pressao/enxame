@@ -59,6 +59,27 @@
         ],
         "type": "object"
       },
+      "EstadoEndpoint": {
+        "properties": {
+          "breaker": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "epoch": {},
+          "partition": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "endpoint",
+          "partition",
+          "epoch",
+          "breaker"
+        ],
+        "type": "object"
+      },
       "Job": {
         "properties": {
           "args": {},
@@ -807,6 +828,74 @@
           }
         ],
         "summary": "desativa um endpoint"
+      }
+    },
+    "/v1/webhooks/endpoints/{id}/state": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoEndpoint"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            },
+            "description": "Too Many Requests",
+            "headers": {
+              "Retry-After": {
+                "description": "segundos até tentar de novo",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            },
+            "description": "Service Unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "segundos até tentar de novo",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "estado do breaker, no dono da partição"
       }
     },
     "/v1/workflows": {

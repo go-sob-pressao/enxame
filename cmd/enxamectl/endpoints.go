@@ -1,8 +1,13 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // livro:inicio ctl-endpoint
@@ -57,3 +62,43 @@ func endpointRemove(c *cliente, args []string) error {
 	return c.chamar("DELETE",
 		"/v1/webhooks/endpoints/"+url.PathEscape(*eid), nil)
 }
+
+// livro:inicio ctl-estado
+
+// endpointState pergunta o estado de um endpoint a qualquer nó e segue
+// o redirecionamento até o dono da partição, levando a época do mapa em
+// que o dono foi indicado. Um 503 de mapa em troca é repetido depois
+// do Retry-After. Três saltos bastam; mais que isso é defeito.
+func endpointState(c *cliente, args []string) error {
+	fs := novoFlagSet("webhook endpoint state")
+	eid := fs.String("id", "", "id do endpoint")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := obrigatorio(fs, "id"); err != nil {
+		return err
+	}
+	api, epoca := c.api, ""
+	for range 4 {
+		resp, err := c.pedir(api, "/v1/webhooks/endpoints/"+
+			url.PathEscape(*eid)+"/state", epoca)
+		if err != nil {
+			return err
+		}
+		switch resp.status {
+		case http.StatusMisdirectedRequest:
+			api = "http://" + resp.header.Get("Enxame-Dono")
+			epoca = resp.header.Get("Enxame-Epoca")
+			fmt.Fprintf(c.saida, "→ %s (época %s)\n", api, epoca)
+			continue
+		case http.StatusServiceUnavailable:
+			s, _ := strconv.Atoi(resp.header.Get("Retry-After"))
+			time.Sleep(time.Duration(max(s, 1)) * time.Second)
+			continue
+		}
+		return c.mostrar(resp)
+	}
+	return errors.New("sem resposta do dono depois de 4 tentativas")
+}
+
+// livro:fim ctl-estado
