@@ -13,9 +13,9 @@ import (
 
 // Experimento 2 — latência entre um nó e o banco.
 //
-// Hipótese: até 300 ms de latência em cada sentido entre um nó (que não
-// é o líder) e o PostgreSQL deixam esse nó mais lento, mas ele não perde
-// as partições, e nenhum job se perde.
+// Hipótese: até 300 ms de latência em cada sentido entre um nó (que
+// não é o líder) e o PostgreSQL deixam esse nó mais lento, mas ele não
+// perde as partições, e nenhum job se perde.
 // Reformulada depois da primeira execução (Cap. 28): "perder" é outro
 // nó tomar a partição, não o lease passar um instante do vencimento
 // sem ninguém que o dispute — que o experimento mostrou acontecer, e

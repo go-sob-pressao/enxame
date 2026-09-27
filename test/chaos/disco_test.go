@@ -47,7 +47,8 @@ func TestDiscoCheio(t *testing.T) {
 	t.Logf("disco cheio %v depois do começo do lastro",
 		cheio.Round(100*time.Millisecond))
 	l.Aguardar(20 * time.Second)
-	if _, err := l.DB.Exec(t.Context(), `DROP TABLE lastro`); err != nil {
+	_, err := l.DB.Exec(t.Context(), `DROP TABLE lastro`)
+	if err != nil {
 		t.Fatalf("liberar o espaço: %v", err)
 	}
 	liberado := time.Now()
@@ -73,8 +74,8 @@ func TestDiscoCheio(t *testing.T) {
 		volta.Round(100*time.Millisecond), vivos)
 	registrarSerie(t, "disco", serie())
 	l.GuardarLogs("disco")
-	if rodaram != len(r.aceitos) || vivos != 3 || volta > 10*time.Second ||
-		volta < 0 {
+	if rodaram != len(r.aceitos) || vivos != 3 ||
+		volta > 10*time.Second || volta < 0 {
 		t.Fatal("hipótese refutada")
 	}
 }
@@ -100,7 +101,8 @@ func bancoComDiscoPequeno(t *testing.T) string {
 		"--mount", "type=tmpfs,destination=/disco,tmpfs-size=67108864",
 		"postgres:18.6")
 	t.Cleanup(func() {
-		_ = exec.Command("docker", "rm", "-f", nome).Run() //nolint:noctx
+		//nolint:noctx // a limpeza roda depois do contexto do teste
+		_ = exec.Command("docker", "rm", "-f", nome).Run()
 	})
 	dsn := "postgres://postgres:enxame@localhost:" + porta +
 		"/postgres?sslmode=disable"
@@ -165,7 +167,9 @@ type resultadoDaCarga struct {
 	encerrada chan struct{}
 }
 
-func (r *resultadoDaCarga) primeiroAceitoDepois(t time.Time) time.Duration {
+func (r *resultadoDaCarga) primeiroAceitoDepois(
+	t time.Time,
+) time.Duration {
 	for _, q := range r.quando {
 		if q.After(t) {
 			return q.Sub(t)
