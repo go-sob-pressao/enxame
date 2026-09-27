@@ -41,6 +41,9 @@ func (s *Store) PublishTx(
 	_, err = enfileirar(ctx, tx, job.Spec{
 		Namespace: namespace, Queue: webhook.FanoutQueue,
 		Kind: webhook.FanoutKind, Args: a,
+		// Os fan-outs do namespace, um por vez, na ordem de publicação:
+		// é o que faz as entregas nascerem nessa ordem (Cap. 26).
+		OrderingKey: nucleo.ChaveDaPublicacao(namespace),
 	}, time.Now())
 	return id, err
 }
@@ -107,6 +110,9 @@ func (s *Store) EnfileirarEntregas(
 					Namespace: m.Namespace, Queue: webhook.FanoutQueue,
 					Kind: webhook.DeliverKind, Args: args(e),
 					UniqueKey: "entrega:" + m.ID + ":" + e,
+					// Uma entrega por vez a cada endpoint, na ordem
+					// das mensagens, na partição dele (Cap. 26).
+					OrderingKey: nucleo.ChaveDoEndpoint(e),
 				}, time.Now())
 				return err
 			})

@@ -35,7 +35,7 @@ const colunas = `job_id::text, namespace, queue, kind, args::text,
 	(SELECT e.payload->>'cause' FROM job_event e
 	  WHERE e.job_id = job.job_id AND e.event_type = 6
 	  ORDER BY e.seq DESC LIMIT 1),
-	version`
+	ordering_key, version`
 
 // Insert grava o job e o histórico numa transação.
 func (s *Store) Insert(
@@ -66,15 +66,16 @@ func inserir(
 	evs []job.Event,
 ) error {
 	_, err := tx.Exec(ctx, `INSERT INTO job (job_id, partition_id,
-		namespace, queue, kind, args, unique_key, state, priority,
-		attempt, max_attempts, scheduled_at, attempted_at,
+		namespace, queue, kind, args, unique_key, ordering_key, state,
+		priority, attempt, max_attempts, scheduled_at, attempted_at,
 		attempted_by, finalized_at, version)
-		VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-		        $12, $13, $14, 1)`,
-		j.ID.String(), j.Namespace, j.Queue, j.Kind, args(j.Args),
-		nulo(j.UniqueKey), string(j.State), j.Priority, j.Attempt,
-		j.MaxAttempts, j.ScheduledAt, instanteNulo(j.AttemptedAt),
-		nulo(j.AttemptedBy), instanteNulo(j.FinalizedAt))
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+		        $13, $14, $15, $16, 1)`,
+		j.ID.String(), j.Particao(), j.Namespace, j.Queue, j.Kind,
+		args(j.Args), nulo(j.UniqueKey), nulo(j.OrderingKey),
+		string(j.State), j.Priority, j.Attempt, j.MaxAttempts,
+		j.ScheduledAt, instanteNulo(j.AttemptedAt), nulo(j.AttemptedBy),
+		instanteNulo(j.FinalizedAt))
 	if err != nil {
 		return traduzir(err)
 	}
@@ -146,6 +147,7 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 		j                      job.Job
 		jid, estado, args      string
 		chave, por, ultimoErro *string
+		ordem                  *string
 		tentado, finalizado    *time.Time
 		batimento              *time.Time
 		prioridade             int16
@@ -168,6 +170,7 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 		&finalizado,
 		&batimento,
 		&ultimoErro,
+		&ordem,
 		&versao,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -182,6 +185,7 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 	j.Args = []byte(args)
 	j.UniqueKey, j.AttemptedBy, j.LastError = texto(chave), texto(por),
 		texto(ultimoErro)
+	j.OrderingKey = texto(ordem)
 	j.State = job.State(estado)
 	j.Priority = int(prioridade)
 	j.ScheduledAt = j.ScheduledAt.UTC()

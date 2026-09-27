@@ -3,13 +3,15 @@ package coordinator
 import (
 	"context"
 	"slices"
+
+	"github.com/go-sob-pressao/enxame/internal/core/id"
 )
 
 // NodeID identifica um nó do cluster.
 type NodeID string
 
 // NumPartitions é fixo na criação do cluster (ADR-010).
-const NumPartitions = 512
+const NumPartitions = id.NumParticoes
 
 // livro:inicio contrato
 

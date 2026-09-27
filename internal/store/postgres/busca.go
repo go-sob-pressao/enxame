@@ -32,8 +32,7 @@ func (s *Store) Claim(
 	}
 	err = s.transacao(ctx, func(tx pgx.Tx) error {
 		j, v, err := ler(tx.QueryRow(ctx, `SELECT `+colunas+` FROM job
-			WHERE partition_id = 0 AND queue = $1
-			  AND state = 'available'
+			WHERE queue = $1 AND state = 'available' AND `+cabeca+`
 			ORDER BY priority, scheduled_at, job_id
 			LIMIT 1 FOR UPDATE SKIP LOCKED`, queue))
 		if errors.Is(err, store.ErrNotFound) {
@@ -56,6 +55,22 @@ func (s *Store) Claim(
 }
 
 // livro:fim busca
+
+// livro:inicio cabeca
+
+// cabeca é a condição da ordem por chave: um job com ordering_key só
+// pode ser reservado se não houver job mais antigo da mesma chave ainda
+// por terminar — nem esperando, nem rodando, nem aguardando o retry. O
+// primeiro da chave que falha segura os seguintes até dar certo ou ser
+// descartado: é o preço da ordem.
+const cabeca = `(ordering_key IS NULL OR NOT EXISTS (
+	SELECT 1 FROM job anterior
+	 WHERE anterior.namespace = job.namespace
+	   AND anterior.ordering_key = job.ordering_key
+	   AND anterior.state NOT IN ('completed', 'discarded', 'cancelled')
+	   AND anterior.job_id < job.job_id))`
+
+// livro:fim cabeca
 
 // Decide aplica, numa transação e com a linha travada, uma decisão do
 // domínio ao job jid: Complete, Fail, Cancel, Rescue.
@@ -94,8 +109,7 @@ func (s *Store) Promote(
 	if err != nil {
 		return 0, err
 	}
-	return s.emLote(ctx, `partition_id = 0
-		AND state IN ('scheduled', 'retryable')
+	return s.emLote(ctx, `state IN ('scheduled', 'retryable')
 		AND scheduled_at <= $1`, at,
 		func(j job.Job) ([]job.Event, error) {
 			return job.MakeAvailable(j, at)
@@ -137,7 +151,7 @@ func (s *Store) Rescue(
 	// O prazo é o que o chamador pediu; o instante, o do relógio que
 	// vale.
 	at, desde = agora, agora.Add(-at.Sub(desde))
-	return s.emLote(ctx, `partition_id = 0 AND state = 'running'
+	return s.emLote(ctx, `state = 'running'
 		AND coalesce(heartbeat_at, attempted_at) < $1`,
 		desde, func(j job.Job) ([]job.Event, error) {
 			return job.Rescue(j, at)

@@ -34,3 +34,14 @@ func Inscrito(e Endpoint, tipo string) bool {
 	return !e.Disabled &&
 		(len(e.EventTypes) == 0 || slices.Contains(e.EventTypes, tipo))
 }
+
+// ChaveDoEndpoint é a chave de ordem das entregas a um endpoint: todas
+// na mesma partição, uma por vez, na ordem das mensagens (Cap. 26).
+func ChaveDoEndpoint(endpointID string) string {
+	return "endpoint:" + endpointID
+}
+
+// ChaveDaPublicacao é a chave de ordem dos fan-outs de um namespace.
+func ChaveDaPublicacao(namespace string) string {
+	return "publicacao:" + namespace
+}

@@ -36,7 +36,8 @@ func Insert(s Spec, at time.Time) ([]Event, Job, error) {
 	j := Job{
 		ID: s.ID, Namespace: s.Namespace, Queue: s.Queue,
 		Kind: s.Kind, Args: s.Args, UniqueKey: s.UniqueKey,
-		Priority: s.Priority, MaxAttempts: s.MaxAttempts,
+		OrderingKey: s.OrderingKey,
+		Priority:    s.Priority, MaxAttempts: s.MaxAttempts,
 	}
 	if j.Priority == 0 {
 		j.Priority = prioridadePadrao

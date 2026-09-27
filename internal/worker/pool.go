@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -56,6 +57,7 @@ type Pool struct {
 
 	executados, falhas, panicos atomic.Int64
 	rodando                     atomic.Bool
+	fim                         sinal // um job terminou
 }
 
 // livro:inicio stats-corrigido
@@ -122,7 +124,8 @@ func (p *Pool) buscar(ctx context.Context, jobs chan<- job.Job) error {
 		if _, err := p.Queue.Promote(p.Now()); err != nil {
 			return err
 		}
-		j, ok, err := queue.Poll(ctx, p.Queue, p.Queue, cfg)
+		j, ok, err := queue.Poll(ctx, p.Queue,
+			despertador{ctx, p.Queue, &p.fim}, cfg)
 		if err != nil {
 			return err
 		}
@@ -147,6 +150,7 @@ func (p *Pool) trabalhar(
 			if err := p.executar(ctx, j); err != nil {
 				return err
 			}
+			p.fim.avisar() // acorda o poller já
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -281,3 +285,58 @@ func (p *Pool) espera(attempt int, err error) time.Duration {
 	}
 	return d
 }
+
+// livro:inicio despertador
+
+// despertador junta dois avisos: o da fila e o do fim de um job deste
+// pool. Com a ordem por chave, o próximo job de uma chave só pode ser
+// reservado quando o anterior termina; esperar o próximo aviso da fila
+// custaria um intervalo inteiro por job, em cada chave.
+type despertador struct {
+	ctx  context.Context
+	fila queue.Notifier
+	fim  *sinal
+}
+
+func (d despertador) Changed() <-chan struct{} {
+	c := make(chan struct{})
+	base, fim := d.fila.Changed(), d.fim.canal()
+	go func() {
+		defer close(c)
+		select {
+		case <-base:
+		case <-fim:
+		case <-d.ctx.Done():
+		}
+	}()
+	return c
+}
+
+// sinal é um aviso para todos os que esperam: avisar fecha o canal
+// corrente, e quem pedir o canal depois recebe um novo. Um canal com
+// buffer não serve: a goroutine de uma espera que já acabou poderia
+// consumir o aviso que era da espera seguinte.
+type sinal struct {
+	mu sync.Mutex
+	c  chan struct{}
+}
+
+func (s *sinal) canal() <-chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.c == nil {
+		s.c = make(chan struct{})
+	}
+	return s.c
+}
+
+func (s *sinal) avisar() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.c != nil {
+		close(s.c)
+		s.c = nil
+	}
+}
+
+// livro:fim despertador
