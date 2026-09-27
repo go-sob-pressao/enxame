@@ -82,6 +82,10 @@ func executar(args []string, saida, erros io.Writer) int {
 		return demonstrar(*demo, saida, erros)
 	}
 	var err error
+	if c.relogio, err = relogioDoNo(); err != nil {
+		fmt.Fprintf(erros, "enxamed: %v\n", err)
+		return 2
+	}
 	if c.tokens, err = lerTokens(*tokens); err != nil ||
 		c.dsn == "" || c.tokenWorker == "" {
 		fmt.Fprintf(erros, "enxamed %s: modo servidor precisa de "+
@@ -122,3 +126,24 @@ func lerTokens(s string) (map[string]string, error) {
 	}
 	return m, nil
 }
+
+// livro:inicio relogio-do-no
+
+// relogioDoNo é o relógio de parede que o enxamed lê para decidir. O
+// laboratório de caos (Cap. 28) o desloca com ENXAME_CAOS_DESVIO —
+// "3m", "-90s" —, para simular um nó com o relógio errado sem mexer
+// no relógio da máquina. Os intervalos (tickers, prazos) continuam no
+// relógio monotônico, como numa máquina com o NTP quebrado.
+func relogioDoNo() (func() time.Time, error) {
+	v := os.Getenv("ENXAME_CAOS_DESVIO")
+	if v == "" {
+		return time.Now, nil
+	}
+	desvio, err := time.ParseDuration(v)
+	if err != nil {
+		return nil, fmt.Errorf("ENXAME_CAOS_DESVIO: %w", err)
+	}
+	return func() time.Time { return time.Now().Add(desvio) }, nil
+}
+
+// livro:fim relogio-do-no

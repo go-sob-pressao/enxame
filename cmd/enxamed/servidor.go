@@ -42,6 +42,7 @@ type config struct {
 	emCurso, naFila int
 	no              string
 	leaseMotor      time.Duration
+	relogio         func() time.Time // o relógio de parede do nó
 }
 
 // livro:inicio servir
@@ -56,6 +57,9 @@ func servir(
 	lisHTTP, lisGRPC net.Listener,
 	log *slog.Logger,
 ) error {
+	if c.relogio == nil {
+		c.relogio = time.Now
+	}
 	db, err := pgxpool.New(ctx, c.dsn)
 	if err != nil {
 		return err
@@ -119,7 +123,7 @@ func servir(
 	//nolint:contextcheck
 	srv := grpc.NewServer(tgrpc.Servidor(c.tokenWorker, log)...)
 	workers := &tgrpc.Server{Motor: sd, Poll: 200 * time.Millisecond,
-		Now: time.Now}
+		Now: c.relogio}
 	enxamev1.RegisterWorkerServiceServer(srv, workers)
 	g.Go(func() error { return srv.Serve(lisGRPC) })
 	g.Go(func() error {
@@ -130,12 +134,12 @@ func servir(
 	})
 
 	g.Go(func() error {
-		return motor(ctx, sd, coord, no, c.resgate, log)
+		return motor(ctx, sd, coord, no, c.resgate, c.relogio, log)
 	})
 	g.Go(func() error {
 		return worker.Supervisionar(ctx, log, "entrega",
 			func(ctx context.Context) error {
-				return entregar(ctx, sd, d, log)
+				return entregar(ctx, sd, d, c.relogio, log)
 			})
 	})
 	log.InfoContext(ctx, "enxamed no ar",
@@ -198,6 +202,7 @@ func motor(
 	coord coordinator.Coordinator,
 	no coordinator.NodeID,
 	resgate time.Duration,
+	relogio func() time.Time,
 	log *slog.Logger,
 ) error {
 	t := time.NewTicker(time.Second)
@@ -206,7 +211,7 @@ func motor(
 		// Um erro do banco — um deadlock, uma conexão caída — vale para
 		// este ciclo; o próximo tenta de novo. Derrubar o nó por ele
 		// seria trocar um erro passageiro por um rebalanceamento.
-		agora := time.Now()
+		agora := relogio()
 		if _, err := s.Promote(ctx, agora); err != nil {
 			avisar(ctx, log, "promover", err)
 		}
@@ -248,6 +253,7 @@ func entregar(
 	ctx context.Context,
 	s *postgres.Store,
 	d *delivery.Entregador,
+	relogio func() time.Time,
 	log *slog.Logger,
 ) error {
 	retry := policy.Retry{Base: 30 * time.Second, Max: time.Hour}
@@ -261,6 +267,6 @@ func entregar(
 			return retry.Delay(a, rand.Float64)
 		},
 		ReportEvery: time.Minute, Worker: "enxamed-entrega",
-		Now: time.Now, Log: log}
+		Now: relogio, Log: log}
 	return p.Run(ctx)
 }

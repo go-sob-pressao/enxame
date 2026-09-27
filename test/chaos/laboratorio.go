@@ -66,10 +66,10 @@ type Laboratorio struct {
 
 // NovoLaboratorio sobe três enxamed num banco novo, cada um falando com
 // o PostgreSQL pelo próprio proxy, espera as 512 partições terem dono
-// e conecta um worker remoto a cada nó. extra acrescenta argumentos à
-// linha de comando do nó i.
+// e conecta um worker remoto a cada nó. env acrescenta variáveis de
+// ambiente ao processo do nó i (de 1 a 3).
 func NovoLaboratorio(t *testing.T, bin Binarios,
-	extra func(i int) []string) *Laboratorio {
+	env func(i int) []string) *Laboratorio {
 	l := &Laboratorio{T: t, Bin: bin, DSN: testutil.PostgresDSN(t),
 		dir: t.TempDir()}
 	db, err := pgxpool.New(t.Context(), l.DSN)
@@ -97,11 +97,12 @@ func NovoLaboratorio(t *testing.T, bin Binarios,
 		args := []string{"-dsn", viaProxy.String(), "-no", n.Nome,
 			"-http", n.HTTP, "-grpc", n.GRPC, "-tokens", "t1:loja",
 			"-worker-token", "w", "-aviso", "0", "-resgate", "5s"}
-		if extra != nil {
-			args = append(args, extra(i)...)
-		}
 		n.Log = filepath.Join(l.dir, n.Nome+".log")
-		n.cmd = l.processo(n.Log, bin.Enxamed, args...)
+		var vars []string
+		if env != nil {
+			vars = env(i)
+		}
+		n.cmd = l.processo(n.Log, vars, bin.Enxamed, args...)
 		l.Nos = append(l.Nos, n)
 	}
 	l.Esperar(30*time.Second, "as 512 partições com dono", func() bool {
@@ -112,7 +113,7 @@ func NovoLaboratorio(t *testing.T, bin Binarios,
 	l.rodar(bin.Cluster, "preparar", "-dsn", l.DSN)
 	for _, n := range l.Nos {
 		n.worker = l.processo(filepath.Join(l.dir, "w-"+n.Nome+".log"),
-			bin.Cluster, "worker", "-dsn", l.DSN, "-grpc", n.GRPC,
+			nil, bin.Cluster, "worker", "-dsn", l.DSN, "-grpc", n.GRPC,
 			"-nome", "w-"+n.Nome)
 	}
 	return l
@@ -120,7 +121,7 @@ func NovoLaboratorio(t *testing.T, bin Binarios,
 
 // livro:fim laboratorio
 
-func (l *Laboratorio) processo(log, bin string,
+func (l *Laboratorio) processo(log string, env []string, bin string,
 	args ...string) *exec.Cmd {
 	f, err := os.Create(log)
 	if err != nil {
@@ -129,6 +130,7 @@ func (l *Laboratorio) processo(log, bin string,
 	// O processo vive até a limpeza do teste, não até o fim de um ctx.
 	c := exec.Command(bin, args...) //nolint:noctx
 	c.Stdout, c.Stderr = f, f
+	c.Env = append(os.Environ(), env...)
 	if err := c.Start(); err != nil {
 		l.T.Fatal(err)
 	}
