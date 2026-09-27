@@ -3,6 +3,7 @@ package sharding
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"slices"
 	"time"
 
@@ -120,6 +121,10 @@ func (r *Rebalanceador) aplicar(
 	r.desistir = agora.Add(r.Espera)
 }
 
+// livro:fim rebalancear
+
+// livro:inicio adquirir
+
 // adquirir insiste nas partições que faltam por até Espera: a drenagem
 // do dono anterior costuma levar menos que isso.
 func (r *Rebalanceador) adquirir(ctx context.Context, agora time.Time) {
@@ -145,7 +150,7 @@ func (r *Rebalanceador) adquirir(ctx context.Context, agora time.Time) {
 	})
 }
 
-// livro:fim rebalancear
+// livro:fim adquirir
 
 func (r *Rebalanceador) drenar(p int, token int64, agora time.Time) {
 	if r.drenando == nil {
@@ -164,10 +169,7 @@ func (r *Rebalanceador) soltarDrenadas(
 	if len(r.drenando) == 0 {
 		return
 	}
-	ps := make([]int, 0, len(r.drenando))
-	for p := range r.drenando {
-		ps = append(ps, p)
-	}
+	ps := slices.Sorted(maps.Keys(r.drenando))
 	emCurso, err := r.EmCurso(ctx, ps)
 	if err != nil {
 		return
