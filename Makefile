@@ -1,7 +1,7 @@
 # Enxame — alvos de desenvolvimento. `make help` lista todos.
 #
-# Os alvos sim e integration informam SKIP explicitamente enquanto não existem
-# cenários: um alvo que "passa" sem testar nada é um verde mentiroso.
+# Um alvo sem nada para testar informa SKIP explicitamente: um alvo que
+# "passa" sem testar nada é um verde mentiroso.
 
 GO      ?= go
 VERSAO  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -38,10 +38,9 @@ arch:            ## regras de dependência entre camadas (tools/archcheck)
 vuln:            ## vulnerabilidades conhecidas nas dependências e na stdlib
 	$(GO) tool govulncheck $(PKGS)
 
-sim:             ## cenários de simulação determinística (Cap. 27)
-	@if ls test/simulation/*_test.go >/dev/null 2>&1; then \
-		$(GO) test -tags=simulation -timeout=30m ./test/simulation/...; \
-	else echo "sim: SKIP — nenhum cenário ainda; entram no Capítulo 27"; fi
+sim:             ## simulação determinística (Cap. 27); make sim SEED=4 roda uma seed
+	$(GO) test -tags=simulation -count=1 -timeout=30m ./test/simulation/... \
+		$(if $(SEED),-v -args -seed=$(SEED))
 
 chaos:           ## experimentos de caos contra cluster real (Cap. 28)
 	@if ls test/chaos/*_test.go >/dev/null 2>&1; then \

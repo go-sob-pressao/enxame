@@ -21,9 +21,6 @@ jobs:
         with: { go-version-file: go.mod, cache: true }
       - name: Varredura de 2.000 seeds
         run: |
-          if ! ls test/simulation/*_test.go >/dev/null 2>&1; then
-            echo "SKIP — nenhum cenário ainda; entram no Capítulo 27"; exit 0
-          fi
           go test -tags=simulation -timeout=120m ./test/simulation/... \
             -args -random-seeds=2000 -lote=${{ matrix.lote }}
       - uses: actions/upload-artifact@v7

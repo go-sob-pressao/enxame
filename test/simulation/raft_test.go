@@ -3,7 +3,7 @@
 // Package simulation — cenários de simulação determinística (Cap. 27).
 //
 //	go test -tags=simulation ./test/simulation/                      seeds 1..200
-//	go test -tags=simulation ./test/simulation/ -args -seed=8371      uma seed
+//	go test -tags=simulation ./test/simulation/ -args -seed=4         uma seed
 //	go test -tags=simulation ./test/simulation/ -args -random-seeds=2000 -lote=1
 package simulation
 

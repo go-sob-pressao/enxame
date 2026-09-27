@@ -178,8 +178,7 @@ func (n *no) iniciar() {
 			return r, err
 		},
 		Intervalo: time.Second, Drenagem: 30 * time.Second,
-		Espera: 2 * time.Second,
-		Log:    slog.New(&diarioHandler{m: m, no: n.id})}
+		Log: slog.New(&diarioHandler{m: m, no: n.id})}
 	_ = n.con.Fazer(func() { m.b.Entrar(n.id) })
 	n.cada(batimento, n.membership)
 	n.cada(batimento, n.coordenar)

@@ -87,7 +87,7 @@ func servir(
 		Lease: partition.Lease{DB: db, No: string(no),
 			Duracao: c.leaseMotor},
 		Posses: posses, Intervalo: time.Second,
-		Drenagem: 30 * time.Second, Espera: 2 * time.Second, Log: log}
+		Drenagem: 30 * time.Second, Log: log}
 	g.Go(func() error { return reb.Run(ctx) })
 	sd := s.ComDono(postgres.Dono{Tokens: posses.Tokens,
 		Perdeu: posses.Largar})

@@ -39,13 +39,11 @@ type Rebalanceador struct {
 	Relogio   clock.Clock   // nil: o relógio do sistema
 	Intervalo time.Duration // renovação e leitura do mapa (1 s)
 	Drenagem  time.Duration // teto para esperar as tentativas (30 s)
-	Espera    time.Duration // quanto insistir na aquisição (2 s)
 	Log       *slog.Logger
 
 	epoca    uint64
 	proxima  time.Time        // próxima renovação e leitura do mapa
-	faltam   []int            // partições do mapa ainda sem posse
-	desistir time.Time        // quando parar de insistir nelas
+	meus     []int            // as partições que o mapa dá a este nó
 	drenando map[int]drenagem // partições saindo, à espera de soltar
 }
 
@@ -85,7 +83,7 @@ func (r *Rebalanceador) Passo(ctx context.Context) {
 		}
 	}
 	r.soltarDrenadas(ctx, agora)
-	r.adquirir(ctx, agora)
+	r.adquirir(ctx)
 }
 
 // aplicar leva as posses ao mapa a, em três fases. Drenar: as partições
@@ -111,43 +109,34 @@ func (r *Rebalanceador) aplicar(
 			}
 		}
 	}
-	r.faltam = nil
-	todas := r.Posses.Todas()
-	for p := range meus {
-		if _, tem := todas[p]; !tem {
-			r.faltam = append(r.faltam, p)
-		}
-	}
-	r.desistir = agora.Add(r.Espera)
+	r.meus = slices.Sorted(maps.Keys(meus))
 }
 
 // livro:fim rebalancear
 
 // livro:inicio adquirir
 
-// adquirir insiste nas partições que faltam por até Espera: a drenagem
-// do dono anterior costuma levar menos que isso.
-func (r *Rebalanceador) adquirir(ctx context.Context, agora time.Time) {
-	if len(r.faltam) == 0 {
+// adquirir tenta, a cada passo, toda partição que o mapa dá a este nó
+// e que ele ainda não tem. Não há prazo para desistir: uma partição do
+// mapa sem posse é uma partição parada, e só este nó vai tomá-la.
+func (r *Rebalanceador) adquirir(ctx context.Context) {
+	todas := r.Posses.Todas()
+	var faltam []int
+	for _, p := range r.meus {
+		if _, tem := todas[p]; !tem {
+			faltam = append(faltam, p)
+		}
+	}
+	if len(faltam) == 0 {
 		return
 	}
-	if agora.After(r.desistir) {
-		r.Log.WarnContext(ctx, "partições não adquiridas",
-			slog.Int("quantas", len(r.faltam)))
-		r.faltam = nil
-		return
-	}
-	ganhas, err := r.Lease.AdquirirVarias(ctx, r.faltam)
+	ganhas, err := r.Lease.AdquirirVarias(ctx, faltam)
 	if err != nil {
 		return
 	}
 	for p, token := range ganhas {
 		r.Posses.Pegar(p, token)
 	}
-	r.faltam = slices.DeleteFunc(r.faltam, func(p int) bool {
-		_, ok := ganhas[p]
-		return ok
-	})
 }
 
 // livro:fim adquirir
