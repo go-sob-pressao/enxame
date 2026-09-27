@@ -14,5 +14,5 @@ redigidas; as demais são registradas quando o capítulo correspondente é escri
 | [006](0006-lock-striped-por-chave.md) | Lock striped por chave (`job_id`, `ordering_key`) | Mutex por partição | 8 | aceita |
 | [007](0007-enfileiramento-transacional.md) | Enfileiramento transacional (`InsertTx`, `PublishTx`) | Publicação direta em broker | 15 | aceita |
 | [008](0008-binario-unico-papeis-modulares.md) | Binário único, papéis modulares; também embutível como biblioteca | Microsserviços desde o início | 2 | aceita |
-| 009 | Simulação determinística | Apenas testes de integração | 27 | proposta |
+| [009](0009-simulacao-deterministica.md) | Simulação determinística dirigida por seed | Apenas testes de integração | 27 | aceita |
 | [010](0010-particoes-fixas.md) | Número de partições fixo (512) | Reparticionamento dinâmico | 26 | aceita |
