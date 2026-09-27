@@ -4,7 +4,9 @@ package chaos
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -338,4 +340,88 @@ func (l *Laboratorio) despejar() {
 		l.T.Logf("== %s (posses %v)\n%s", n.Nome, l.Posses(),
 			strings.Join(linhas, "\n"))
 	}
+}
+
+// Visao é o que o nó de acha do nó sobre, pela API: estado, phi e
+// silêncio em milissegundos.
+func (l *Laboratorio) Visao(de, sobre *No) (string, float64, int64) {
+	req, err := http.NewRequestWithContext(l.T.Context(),
+		http.MethodGet,
+		"http://"+de.HTTP+"/v1/cluster/members", nil)
+	if err != nil {
+		return "", 0, 0
+	}
+	req.Header.Set("Authorization", "Bearer t1")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", 0, 0
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var lista struct {
+		Items []struct {
+			Node    string  `json:"node"`
+			State   string  `json:"state"`
+			Phi     float64 `json:"phi"`
+			Silence int64   `json:"silence_ms"`
+		} `json:"items"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&lista)
+	for _, m := range lista.Items {
+		if m.Node == sobre.Nome {
+			return m.State, m.Phi, m.Silence
+		}
+	}
+	return "", 0, 0
+}
+
+// NoMapa diz se o nó está no último mapa do coordenador, e a época.
+func (l *Laboratorio) NoMapa(n *No) (bool, int) {
+	var epoca int
+	var tem bool
+	_ = l.DB.QueryRow(l.T.Context(), `SELECT epoch,
+		owners ? $1 FROM coord_assignment
+		ORDER BY epoch DESC LIMIT 1`, n.Nome).Scan(&epoca, &tem)
+	return tem, epoca
+}
+
+// ConcluidosPor conta os jobs da carga concluídos pelo worker do nó.
+func (l *Laboratorio) ConcluidosPor(n *No) int {
+	var c int
+	_ = l.DB.QueryRow(l.T.Context(), `SELECT count(*) FROM job
+		WHERE queue = 'carga' AND state = 'completed'
+		  AND attempted_by = $1`, "w-"+n.Nome).Scan(&c)
+	return c
+}
+
+// GuardarLogs copia os logs dos nós e dos workers para testdata/, onde
+// sobrevivem ao teste.
+func (l *Laboratorio) GuardarLogs(nome string) {
+	for _, n := range l.Nos {
+		for _, arq := range []string{n.Nome + ".log",
+			"w-" + n.Nome + ".log"} {
+			b, _ := os.ReadFile(filepath.Join(l.dir, arq))
+			escrever(l.T, filepath.Join("testdata", nome, arq),
+				string(b))
+		}
+	}
+}
+
+// Tomadas conta as partições que o último mapa dá ao nó e que estão,
+// agora, com a posse válida de outro nó.
+func (l *Laboratorio) Tomadas(n *No) int {
+	var c int
+	_ = l.DB.QueryRow(l.T.Context(), `SELECT count(*)
+		FROM partition_lease p, (SELECT owners FROM coord_assignment
+		  ORDER BY epoch DESC LIMIT 1) a
+		WHERE a.owners->>p.partition_id = $1 AND p.owner <> $1
+		  AND p.lease_expires_at > now()`, n.Nome).Scan(&c)
+	return c
+}
+
+// RenovacoesEsperando conta as renovações de posse (de todos os nós)
+// esperando um lock no banco, agora.
+func (l *Laboratorio) RenovacoesEsperando() int {
+	return l.Contar(`SELECT count(*) FROM pg_stat_activity
+		WHERE wait_event_type = 'Lock'
+		  AND query LIKE '%SET lease_expires_at = now()%'`)
 }
