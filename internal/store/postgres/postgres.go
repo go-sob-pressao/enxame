@@ -22,6 +22,7 @@ type Store struct {
 	pool  *pgxpool.Pool
 	cerca *Cerca // nil: sem fencing (ver ComCerca)
 	banco bool   // instantes do relógio do banco (ver RelogioDoBanco)
+	dono  *Dono  // nil: reserva em todas as partições (ver ComDono)
 }
 
 // New usa o pool dado; quem o criou é quem o fecha.

@@ -11,6 +11,7 @@ type NovoJob struct {
 	Kind        string         `json:"kind"`
 	Args        jsontext.Value `json:"args,omitzero"`
 	UniqueKey   string         `json:"unique_key,omitzero"`
+	OrderingKey string         `json:"ordering_key,omitzero"`
 	RunAt       time.Time      `json:"run_at,omitzero"`
 	MaxAttempts int            `json:"max_attempts,omitzero"`
 }

@@ -233,6 +233,9 @@
           "max_attempts": {
             "type": "integer"
           },
+          "ordering_key": {
+            "type": "string"
+          },
           "queue": {
             "type": "string"
           },

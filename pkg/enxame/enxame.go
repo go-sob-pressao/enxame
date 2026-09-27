@@ -51,6 +51,12 @@ func UniqueKey(k string) Option {
 	return func(s *job.Spec) { s.UniqueKey = k }
 }
 
+// OrderingKey faz os jobs com a mesma chave rodarem um por vez, na
+// ordem em que foram enfileirados — e todos na mesma partição.
+func OrderingKey(k string) Option {
+	return func(s *job.Spec) { s.OrderingKey = k }
+}
+
 // RunAt agenda o job para o instante dado.
 func RunAt(t time.Time) Option {
 	return func(s *job.Spec) { s.RunAt = t }

@@ -30,6 +30,9 @@ func (s *Store) Claim(
 	if err != nil {
 		return job.Job{}, false, err
 	}
+	if s.dono != nil {
+		return s.claimDoDono(ctx, queue, at, worker)
+	}
 	err = s.transacao(ctx, func(tx pgx.Tx) error {
 		j, v, err := ler(tx.QueryRow(ctx, `SELECT `+colunas+` FROM job
 			WHERE queue = $1 AND state = 'available' AND `+cabeca+`
@@ -55,6 +58,65 @@ func (s *Store) Claim(
 }
 
 // livro:fim busca
+
+// livro:inicio claim-do-dono
+
+// claimDoDono reserva só das partições do nó, e confere, na mesma
+// transação, o token da partição do job que achou. Um token recusado
+// quer dizer que a partição tem outro dono: o nó é avisado, e a
+// reserva volta vazia em vez de derrubar o pool.
+func (s *Store) claimDoDono(
+	ctx context.Context,
+	queue string,
+	at time.Time,
+	worker string,
+) (job.Job, bool, error) {
+	tokens := s.dono.Tokens()
+	if len(tokens) == 0 {
+		return job.Job{}, false, nil
+	}
+	parts := make([]int32, 0, len(tokens))
+	for p := range tokens {
+		parts = append(parts, int32(p)) //nolint:gosec // < 512
+	}
+	var reservado job.Job
+	achou, particao := false, -1
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		j, v, err := ler(tx.QueryRow(ctx, `SELECT `+colunas+` FROM job
+			WHERE partition_id = ANY($2) AND queue = $1
+			  AND state = 'available' AND `+cabeca+`
+			ORDER BY priority, scheduled_at, job_id
+			LIMIT 1 FOR UPDATE SKIP LOCKED`, queue, parts))
+		if errors.Is(err, store.ErrNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		particao = j.Particao()
+		err = ConferirCerca(ctx, tx, Cerca{Particao: particao,
+			RangeID: tokens[particao]})
+		if err != nil {
+			return err
+		}
+		evs, err := job.Start(j, at, worker)
+		if err != nil {
+			return err
+		}
+		if reservado, err = job.ApplyAll(j, evs); err != nil {
+			return err
+		}
+		achou = true
+		return gravar(ctx, tx, reservado, evs, v)
+	})
+	if errors.Is(err, store.ErrCercado) {
+		s.dono.Perdeu(particao)
+		return job.Job{}, false, nil
+	}
+	return reservado, achou, err
+}
+
+// livro:fim claim-do-dono
 
 // livro:inicio cabeca
 
@@ -109,7 +171,8 @@ func (s *Store) Promote(
 	if err != nil {
 		return 0, err
 	}
-	return s.emLote(ctx, `state IN ('scheduled', 'retryable')
+	return s.emLote(ctx, `state IN ('scheduled', 'retryable')`+
+		s.particaoDaCerca()+`
 		AND scheduled_at <= $1`, at,
 		func(j job.Job) ([]job.Event, error) {
 			return job.MakeAvailable(j, at)
@@ -151,7 +214,7 @@ func (s *Store) Rescue(
 	// O prazo é o que o chamador pediu; o instante, o do relógio que
 	// vale.
 	at, desde = agora, agora.Add(-at.Sub(desde))
-	return s.emLote(ctx, `state = 'running'
+	return s.emLote(ctx, `state = 'running'`+s.particaoDaCerca()+`
 		AND coalesce(heartbeat_at, attempted_at) < $1`,
 		desde, func(j job.Job) ([]job.Event, error) {
 			return job.Rescue(j, at)
@@ -169,10 +232,22 @@ func (s *Store) emLote(
 	decidir func(job.Job) ([]job.Event, error),
 ) (int, error) {
 	n := 0
+	var perdidas []int
 	err := s.transacao(ctx, func(tx pgx.Tx) error {
+		args := []any{arg}
+		if s.dono != nil {
+			validas, fora, err := conferirCercas(ctx, tx,
+				s.dono.Tokens())
+			if err != nil {
+				return err
+			}
+			perdidas = fora
+			onde += " AND partition_id = ANY($2)"
+			args = append(args, validas)
+		}
 		rows, err := tx.Query(ctx, `SELECT `+colunas+` FROM job
 			WHERE `+onde+` ORDER BY job_id LIMIT 100
-			FOR UPDATE SKIP LOCKED`, arg)
+			FOR UPDATE SKIP LOCKED`, args...)
 		if err != nil {
 			return err
 		}
@@ -209,6 +284,9 @@ func (s *Store) emLote(
 		}
 		return nil
 	})
+	for _, p := range perdidas {
+		s.dono.Perdeu(p)
+	}
 	return n, err
 }
 

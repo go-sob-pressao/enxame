@@ -87,3 +87,66 @@ func (s *Store) instante(ctx context.Context, at time.Time) (time.Time,
 	err := s.pool.QueryRow(ctx, `SELECT now()`).Scan(&agora)
 	return agora, err
 }
+
+// Dono diz ao Store quais partições este nó tem, com o token de cada
+// uma, e a quem avisar quando uma delas se revelar perdida.
+type Dono struct {
+	Tokens func() map[int]int64
+	Perdeu func(particao int)
+}
+
+// ComDono devolve uma cópia do Store cuja reserva só pega jobs das
+// partições do nó, conferindo o token da partição do job reservado. O
+// modo biblioteca não usa: sem dono, a reserva pega de todas.
+func (s *Store) ComDono(d Dono) *Store {
+	n := *s
+	n.dono = &d
+	return &n
+}
+
+// particaoDaCerca restringe promoção e resgate à partição da cerca, se
+// houver: cada dono cuida só das suas.
+func (s *Store) particaoDaCerca() string {
+	if s.cerca == nil {
+		return ""
+	}
+	return fmt.Sprintf(" AND partition_id = %d", s.cerca.Particao)
+}
+
+// livro:inicio cercas
+
+// conferirCercas confere, com um FOR SHARE só, os tokens de todas as
+// partições do nó, e devolve as que continuam dele e as perdidas. A
+// promoção e o resgate do dono agem só nas válidas, na mesma transação.
+func conferirCercas(
+	ctx context.Context,
+	tx pgx.Tx,
+	tokens map[int]int64,
+) (validas []int32, perdidas []int, err error) {
+	ps := make([]int32, 0, len(tokens))
+	for p := range tokens {
+		ps = append(ps, int32(p)) //nolint:gosec // < 512
+	}
+	rows, err := tx.Query(ctx, `SELECT partition_id, range_id
+		FROM partition_lease WHERE partition_id = ANY($1)
+		ORDER BY partition_id FOR SHARE`, ps)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p int
+		var r int64
+		if err := rows.Scan(&p, &r); err != nil {
+			return nil, nil, err
+		}
+		if r == tokens[p] {
+			validas = append(validas, int32(p)) //nolint:gosec // < 512
+		} else {
+			perdidas = append(perdidas, p)
+		}
+	}
+	return validas, perdidas, rows.Err()
+}
+
+// livro:fim cercas

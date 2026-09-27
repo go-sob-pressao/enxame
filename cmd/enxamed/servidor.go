@@ -16,6 +16,8 @@ import (
 
 	"github.com/go-sob-pressao/enxame/internal/cluster/coordinator"
 	"github.com/go-sob-pressao/enxame/internal/cluster/membership"
+	"github.com/go-sob-pressao/enxame/internal/cluster/pgcoord"
+	"github.com/go-sob-pressao/enxame/internal/cluster/sharding"
 	"github.com/go-sob-pressao/enxame/internal/core/policy"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/delivery"
@@ -70,6 +72,24 @@ func servir(
 		Endereco: lisHTTP.Addr().String(), DB: db, Log: log})
 	g.Go(func() error { return m.Run(ctx) })
 
+	// Quem manda e de quem é cada partição (Caps. 23 a 26): o pgcoord
+	// escreve o mapa; o rebalanceador faz as posses segui-lo; o Store
+	// "do dono" só reserva, promove e resgata nas partições do nó, com
+	// o token de cada uma conferido.
+	coord := pgcoord.New(ctx, pgcoord.Config{ID: no, Pool: db,
+		Membros: m, Intervalo: 500 * time.Millisecond,
+		Lease: 3 * time.Second, Log: log})
+	defer func() { _ = coord.Close() }()
+	posses := &partition.Posses{}
+	reb := &sharding.Rebalanceador{No: no, Coord: coord, DB: db,
+		Lease: partition.Lease{DB: db, No: string(no),
+			Duracao: c.leaseMotor},
+		Posses: posses, Intervalo: time.Second,
+		Drenagem: 30 * time.Second, Espera: 2 * time.Second, Log: log}
+	g.Go(func() error { return reb.Run(ctx) })
+	sd := s.ComDono(postgres.Dono{Tokens: posses.Tokens,
+		Perdeu: posses.Largar})
+
 	a := api.NovaAPI(db, c.tokens, log)
 	a.Cluster = m
 	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
@@ -82,7 +102,7 @@ func servir(
 	// Cada chamada traz o próprio contexto, do stream.
 	//nolint:contextcheck
 	srv := grpc.NewServer(tgrpc.Servidor(c.tokenWorker, log)...)
-	workers := &tgrpc.Server{Motor: s, Poll: 200 * time.Millisecond,
+	workers := &tgrpc.Server{Motor: sd, Poll: 200 * time.Millisecond,
 		Now: time.Now}
 	enxamev1.RegisterWorkerServiceServer(srv, workers)
 	g.Go(func() error { return srv.Serve(lisGRPC) })
@@ -93,17 +113,10 @@ func servir(
 		return nil
 	})
 
-	// O motor — promover, resgatar, disparar — é do dono da partição 0,
-	// e cada transação dele confere o token (ADR-005).
-	dono := partition.Dono{Particao: 0, Log: log,
-		Lease: partition.Lease{DB: db, No: string(no),
-			Duracao: c.leaseMotor}}
-	doMotor := func(ctx context.Context, token int64) error {
-		return motor(ctx, s.ComCerca(postgres.Cerca{Particao: 0,
-			RangeID: token}), c.resgate)
-	}
-	g.Go(func() error { return dono.Run(ctx, doMotor) })
-	g.Go(func() error { return entregar(ctx, s, log) })
+	g.Go(func() error {
+		return motor(ctx, sd, coord, no, c.resgate, log)
+	})
+	g.Go(func() error { return entregar(ctx, sd, log) })
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
 		slog.String("grpc", lisGRPC.Addr().String()))
@@ -142,31 +155,58 @@ func pararGRPC(srv *grpc.Server, prazo time.Duration) {
 
 // motor é o papel de motor no modo servidor: o que o worker embutido
 // faz no modo biblioteca.
+// livro:inicio motor
+
+// motor promove e resgata nas partições deste nó — o Store do dono
+// confere os tokens de todas numa transação —, e dispara os
+// agendamentos se este nó for o líder: os disparos não têm partição, e
+// a chave de cada janela absorve o que um líder antigo repetir.
 func motor(
 	ctx context.Context,
 	s *postgres.Store,
+	coord coordinator.Coordinator,
+	no coordinator.NodeID,
 	resgate time.Duration,
+	log *slog.Logger,
 ) error {
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {
+		// Um erro do banco — um deadlock, uma conexão caída — vale para
+		// este ciclo; o próximo tenta de novo. Derrubar o nó por ele
+		// seria trocar um erro passageiro por um rebalanceamento.
 		agora := time.Now()
 		if _, err := s.Promote(ctx, agora); err != nil {
-			return err
+			avisar(ctx, log, "promover", err)
 		}
 		if _, err := s.Rescue(ctx, agora,
 			agora.Add(-resgate)); err != nil {
-			return err
+			avisar(ctx, log, "resgatar", err)
 		}
-		if _, _, err := s.FireDue(ctx, agora,
-			schedule.Disparo); err != nil {
-			return err
+		if l, _ := coord.Leader(ctx); l == no {
+			if _, _, err := s.FireDue(ctx, agora,
+				schedule.Disparo); err != nil {
+				avisar(ctx, log, "disparar", err)
+			}
 		}
 		select {
 		case <-t.C:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+// livro:fim motor
+
+func avisar(
+	ctx context.Context,
+	log *slog.Logger,
+	o string,
+	err error,
+) {
+	if ctx.Err() == nil {
+		log.WarnContext(ctx, "motor: "+o, slog.Any("erro", err))
 	}
 }
 

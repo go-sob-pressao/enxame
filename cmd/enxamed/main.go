@@ -65,8 +65,8 @@ func executar(args []string, saida, erros io.Writer) int {
 	fs.IntVar(&c.naFila, "max-na-fila", 100000,
 		"jobs esperando por namespace antes de responder 429 "+
 			"(0: sem limite)")
-	fs.DurationVar(&c.leaseMotor, "lease", 10*time.Second,
-		"posse da partição do motor sem renovação")
+	fs.DurationVar(&c.leaseMotor, "lease", 3*time.Second,
+		"posse de cada partição sem renovação")
 	fs.StringVar(&c.no, "no", "",
 		"nome deste nó no cluster (padrão: máquina-pid)")
 	if err := fs.Parse(args); err != nil {

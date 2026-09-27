@@ -43,6 +43,9 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 	if n.UniqueKey != "" {
 		opts = append(opts, enxame.UniqueKey(n.UniqueKey))
 	}
+	if n.OrderingKey != "" {
+		opts = append(opts, enxame.OrderingKey(n.OrderingKey))
+	}
 	if !n.RunAt.IsZero() {
 		opts = append(opts, enxame.RunAt(n.RunAt))
 	}
