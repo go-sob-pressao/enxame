@@ -132,7 +132,12 @@ func servir(
 	g.Go(func() error {
 		return motor(ctx, sd, coord, no, c.resgate, log)
 	})
-	g.Go(func() error { return entregar(ctx, sd, d, log) })
+	g.Go(func() error {
+		return worker.Supervisionar(ctx, log, "entrega",
+			func(ctx context.Context) error {
+				return entregar(ctx, sd, d, log)
+			})
+	})
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
 		slog.String("grpc", lisGRPC.Addr().String()))

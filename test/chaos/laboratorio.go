@@ -304,9 +304,32 @@ func escrever(t *testing.T, arq, conteudo string) {
 	}
 }
 
-// despejar mostra o fim do log de cada nó, para o diagnóstico.
+// despejar mostra os jobs da carga que não terminaram e o fim do log
+// de cada nó, para o diagnóstico.
 func (l *Laboratorio) despejar() {
+	rows, err := l.DB.Query(l.T.Context(), `SELECT j.state,
+		j.partition_id, j.attempt, coalesce(j.attempted_by, ''),
+		coalesce(p.owner, ''), p.range_id, count(*)
+		FROM job j JOIN partition_lease p USING (partition_id)
+		WHERE j.queue = 'carga' AND j.state <> 'completed'
+		GROUP BY 1, 2, 3, 4, 5, 6 ORDER BY 2 LIMIT 30`)
+	if err == nil {
+		for rows.Next() {
+			var st, por, dono string
+			var part, tent, n int
+			var rid int64
+			_ = rows.Scan(&st, &part, &tent, &por, &dono, &rid, &n)
+			l.T.Logf("pendente: %d job(s) %s, partição %d (dono %s, "+
+				"token %d), tentativa %d por %q", n, st, part, dono,
+				rid, tent, por)
+		}
+		rows.Close()
+	}
 	for _, n := range l.Nos {
+		w, _ := os.ReadFile(filepath.Join(l.dir, "w-"+n.Nome+".log"))
+		if len(w) > 0 {
+			l.T.Logf("== worker de %s\n%s", n.Nome, w)
+		}
 		b, _ := os.ReadFile(n.Log)
 		linhas := strings.Split(strings.TrimSpace(string(b)), "\n")
 		if len(linhas) > 25 {

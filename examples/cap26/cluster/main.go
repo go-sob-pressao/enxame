@@ -120,10 +120,6 @@ func trabalhar(ctx context.Context, db *pgxpool.Pool, addr,
 		return err
 	}
 	defer func() { _ = conn.Close() }()
-	r, err := poller.Conectar(ctx, conn, nome, []string{"carga"}, 4)
-	if err != nil {
-		return err
-	}
 	h := func(ctx context.Context, j job.Job) error {
 		var t trabalho
 		if err := json.Unmarshal(j.Args, &t); err != nil {
@@ -146,13 +142,25 @@ func trabalhar(ctx context.Context, db *pgxpool.Pool, addr,
 			return err
 		})
 	}
-	p := &worker.Pool{Queue: r, QueueName: "carga", Concurrency: 4,
-		Handlers:    map[string]runner.Handler{"trabalho": h},
-		PollTimeout: time.Second, AttemptTimeout: time.Minute,
-		RetryDelay: time.Second, ReportEvery: time.Hour,
-		Heartbeat: r.Heartbeat, HeartbeatEvery: time.Second,
-		Worker: nome, Now: time.Now, Log: slog.New(slog.DiscardHandler)}
-	return p.Run(ctx)
+	// O pool para no primeiro erro da fila (Cap. 7); o worker é um
+	// processo, e uma falha do servidor não pode derrubá-lo: cada volta
+	// abre um stream novo e um pool novo (Cap. 28).
+	volta := func(ctx context.Context) error {
+		r, err := poller.Conectar(ctx, conn, nome, []string{"carga"}, 4)
+		if err != nil {
+			return err
+		}
+		p := &worker.Pool{Queue: r, QueueName: "carga", Concurrency: 4,
+			Handlers:    map[string]runner.Handler{"trabalho": h},
+			PollTimeout: time.Second, AttemptTimeout: time.Minute,
+			RetryDelay: time.Second, ReportEvery: time.Hour,
+			Heartbeat: r.Heartbeat, HeartbeatEvery: time.Second,
+			Worker: nome, Now: time.Now,
+			Log: slog.New(slog.DiscardHandler)}
+		return p.Run(ctx)
+	}
+	return worker.Supervisionar(ctx,
+		slog.New(slog.NewTextHandler(os.Stderr, nil)), "worker", volta)
 }
 
 // livro:fim worker-cluster
