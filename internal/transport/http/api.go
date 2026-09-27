@@ -79,6 +79,13 @@ var erroHTTP = []struct {
 var errEntrada = errors.New("entrada inválida")
 
 func (a *API) erro(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, store.ErrSemRecursos) { // passageiro (Cap. 28)
+		a.Log.WarnContext(r.Context(), "armazenamento sem recursos",
+			slog.String("rota", r.Pattern), slog.Any("erro", err))
+		recusar(w, http.StatusServiceUnavailable, 5*time.Second,
+			Erro{"unavailable", "armazenamento sem recursos"})
+		return
+	}
 	for _, e := range erroHTTP {
 		if errors.Is(err, e.erro) {
 			escrever(w, e.status, Erro{e.codigo, err.Error()})

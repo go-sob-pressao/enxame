@@ -17,4 +17,7 @@ var (
 	// nó carrega é antigo, e a transação foi desfeita.
 	ErrCercado = errors.New(
 		"partição com outro dono (fencing token antigo)")
+	// ErrSemRecursos: o armazenamento está sem disco, memória ou
+	// conexões; a mesma operação pode dar certo daqui a pouco.
+	ErrSemRecursos = errors.New("armazenamento sem recursos")
 )

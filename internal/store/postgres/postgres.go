@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -80,7 +81,7 @@ func inserir(
 	if err != nil {
 		return traduzir(err)
 	}
-	return acrescentar(ctx, tx, j.ID, evs)
+	return traduzir(acrescentar(ctx, tx, j.ID, evs))
 }
 
 // Get devolve a projeção e a versão.
@@ -195,15 +196,19 @@ func ler(r pgx.Row) (job.Job, int64, error) {
 	return j, versao, nil
 }
 
-// traduzir converte a violação de unicidade (23505) em ErrDuplicate.
+// traduzir converte a violação de unicidade (23505) em ErrDuplicate, e
+// a falta de recursos do servidor — classe 53: disco cheio, memória,
+// conexões — em ErrSemRecursos (Cap. 28).
 func traduzir(err error) error {
 	var pg *pgconn.PgError
-	if errors.As(err, &pg) && pg.Code == "23505" {
-		return fmt.Errorf(
-			"%w: %s",
-			store.ErrDuplicate,
-			pg.ConstraintName,
-		)
+	switch {
+	case !errors.As(err, &pg):
+		return err
+	case pg.Code == "23505":
+		return fmt.Errorf("%w: %s", store.ErrDuplicate,
+			pg.ConstraintName)
+	case strings.HasPrefix(pg.Code, "53"):
+		return fmt.Errorf("%w: %w", store.ErrSemRecursos, err)
 	}
 	return err
 }

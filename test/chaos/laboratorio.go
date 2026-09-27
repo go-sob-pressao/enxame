@@ -427,3 +427,18 @@ func (l *Laboratorio) RenovacoesEsperando() int {
 		WHERE wait_event_type = 'Lock'
 		  AND query LIKE '%SET lease_expires_at = now()%'`)
 }
+
+// Vivo diz se o processo do nó responde no /healthz.
+func (l *Laboratorio) Vivo(n *No) bool {
+	req, err := http.NewRequestWithContext(l.T.Context(),
+		http.MethodGet, "http://"+n.HTTP+"/healthz", nil)
+	if err != nil {
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
