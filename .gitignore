@@ -7,3 +7,4 @@ coverage.*
 .idea/
 .vscode/
 __debug_bin*
+test/simulation/failures/
