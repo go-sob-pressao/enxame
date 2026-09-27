@@ -8,3 +8,4 @@ coverage.*
 .vscode/
 __debug_bin*
 test/simulation/failures/
+test/chaos/testdata/

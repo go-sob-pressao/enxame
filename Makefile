@@ -42,10 +42,9 @@ sim:             ## simulação determinística (Cap. 27); make sim SEED=4 roda 
 	$(GO) test -tags=simulation -count=1 -timeout=30m ./test/simulation/... \
 		$(if $(SEED),-v -args -seed=$(SEED))
 
-chaos:           ## experimentos de caos contra cluster real (Cap. 28)
-	@if ls test/chaos/*_test.go >/dev/null 2>&1; then \
-		$(GO) test -tags=chaos -timeout=30m ./test/chaos/...; \
-	else echo "chaos: SKIP — nenhum experimento ainda; entram no Capítulo 28"; fi
+chaos:           ## experimentos de caos contra cluster real (Cap. 28; make up)
+	$(GO) test -tags=chaos -count=1 -v -timeout=60m ./test/chaos/... \
+		$(if $(EXP),-run $(EXP))
 
 integration:     ## integração contra Postgres real (make up; ENXAME_DB_DSN)
 	@if ls test/integration/*_test.go >/dev/null 2>&1; then \
