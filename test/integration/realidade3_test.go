@@ -30,7 +30,8 @@ func TestRealidade3(t *testing.T) {
 	enxamed := filepath.Join(dir, "enxamed")
 	cluster := filepath.Join(dir, "cluster")
 	rodar(t, "go", "build", "-o", enxamed, "../../cmd/enxamed")
-	rodar(t, "go", "build", "-o", cluster, "../../examples/cap26/cluster")
+	rodar(t, "go", "build", "-o", cluster,
+		"../../examples/cap26/cluster")
 	dsn := testutil.PostgresDSN(t)
 	db, err := pgxpool.New(t.Context(), dsn)
 	if err != nil {
