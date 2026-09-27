@@ -300,3 +300,32 @@ func (s *Store) Esperando(ctx context.Context, ns string) (int, error) {
 		ns).Scan(&n)
 	return n, err
 }
+
+// Vencidos devolve os jobs da partição que esperam a hora e cuja hora
+// caiu em (desde, ate]. Existe para o promotor por janela da Missão #5.
+func (s *Store) Vencidos(
+	ctx context.Context,
+	particao int,
+	desde, ate time.Time,
+) ([]id.JobID, error) {
+	rows, err := s.pool.Query(ctx, `SELECT job_id::text FROM job
+		WHERE partition_id = $1 AND state IN ('scheduled', 'retryable')
+		  AND scheduled_at > $2 AND scheduled_at <= $3`,
+		particao, desde, ate)
+	if err != nil {
+		return nil, err
+	}
+	textos, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]id.JobID, 0, len(textos))
+	for _, t := range textos {
+		jid, err := id.ParseJobID(t)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, jid)
+	}
+	return ids, nil
+}
