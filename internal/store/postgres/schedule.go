@@ -31,10 +31,11 @@ func (s *Store) UpsertSchedule(
 
 // livro:inicio fire-due
 
-// FireDue dispara os agendamentos vencidos até now, numa transação:
-// trava cada um com SKIP LOCKED, enfileira o job da janela e avança
-// next_fire_at. Um job com a mesma chave — a janela já disparada — é
-// absorvido pelo índice único, e o agendamento avança assim mesmo.
+// FireDue dispara os agendamentos vencidos até now — o now() do banco,
+// no Store com RelogioDoBanco —, numa transação: trava cada um com SKIP
+// LOCKED, enfileira o job da janela e avança next_fire_at. Um job com a
+// mesma chave — a janela já disparada — é absorvido pelo índice único,
+// e o agendamento avança assim mesmo.
 func (s *Store) FireDue(
 	ctx context.Context,
 	now time.Time,
@@ -42,6 +43,12 @@ func (s *Store) FireDue(
 		job.Spec, time.Time, error),
 ) (disparados, absorvidos int, err error) {
 	err = s.transacao(ctx, func(tx pgx.Tx) error {
+		if s.banco { // a janela vence no relógio do banco (Cap. 28)
+			if err := tx.QueryRow(ctx, `SELECT now()`).
+				Scan(&now); err != nil {
+				return err
+			}
+		}
 		vencidos, err := vencidos(ctx, tx, now)
 		if err != nil {
 			return err

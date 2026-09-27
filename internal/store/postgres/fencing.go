@@ -27,10 +27,11 @@ func (s *Store) ComCerca(c Cerca) *Store {
 	return &n
 }
 
-// RelogioDoBanco devolve uma cópia do Store que usa o now() do banco,
-// e não o instante que o chamador passa, na reserva, no batimento, na
-// promoção e no resgate: um relógio só para todos os nós (Caps. 22 e
-// 24). O instante injetado continua valendo nos testes do contrato.
+// RelogioDoBanco devolve uma cópia do Store que usa o now() do banco, e
+// não o instante que o chamador passa, na reserva, no batimento, na
+// promoção, no resgate e no disparo de agendamentos: um relógio só para
+// todos os nós (Caps. 22, 24 e 28). O instante injetado continua
+// valendo nos testes do contrato.
 func (s *Store) RelogioDoBanco() *Store {
 	n := *s
 	n.banco = true
