@@ -15,4 +15,4 @@ redigidas; as demais são registradas quando o capítulo correspondente é escri
 | [007](0007-enfileiramento-transacional.md) | Enfileiramento transacional (`InsertTx`, `PublishTx`) | Publicação direta em broker | 15 | aceita |
 | [008](0008-binario-unico-papeis-modulares.md) | Binário único, papéis modulares; também embutível como biblioteca | Microsserviços desde o início | 2 | aceita |
 | 009 | Simulação determinística | Apenas testes de integração | 27 | proposta |
-| 010 | Número de partições fixo (512) | Reparticionamento dinâmico | 26 | proposta |
+| [010](0010-particoes-fixas.md) | Número de partições fixo (512) | Reparticionamento dinâmico | 26 | aceita |
