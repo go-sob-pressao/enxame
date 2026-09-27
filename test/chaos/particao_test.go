@@ -33,13 +33,16 @@ func TestParticaoDoLider(t *testing.T) {
 	l.Aguardar(3 * time.Second)
 	lider.Proxy.Cortar()
 	corte := time.Now()
+	l.Marcar("corte")
 	donos := l.Esperar(30*time.Second, "partições do líder com outro "+
 		"dono", func() bool {
 		return l.Posses()[lider.Nome] == 0 &&
 			soma(l.Posses()) == 512
 	})
+	l.Marcar("partições com outro dono")
 	l.Aguardar(10*time.Second - time.Since(corte))
 	lider.Proxy.Religar()
+	l.Marcar("religado")
 	volta := l.Esperar(60*time.Second, "o líder com partições de novo",
 		func() bool { return l.Posses()[lider.Nome] > 0 })
 
@@ -58,6 +61,8 @@ func TestParticaoDoLider(t *testing.T) {
 	saida := l.Conferir(1000)
 	t.Log("\n" + saida)
 	registrarSerie(t, "particao", serie())
+	escrever(t, "testdata/particao-marcas.csv",
+		"t_s,evento\n"+strings.Join(l.marcas, "\n")+"\n")
 	if !strings.Contains(saida, "perdidos: 0;") ||
 		!strings.Contains(saida, "fora de ordem: 0") {
 		t.Fatal("hipótese refutada: job perdido ou fora de ordem")

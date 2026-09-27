@@ -60,14 +60,24 @@ type Laboratorio struct {
 	DB  *pgxpool.Pool
 	Nos []*No
 	dir string
+
+	inicioSerie time.Time
+	marcas      []string // "t_s,evento"
+}
+
+// Marcar anota um evento na série, no instante de agora.
+func (l *Laboratorio) Marcar(evento string) {
+	l.marcas = append(l.marcas, fmt.Sprintf("%.1f,%s",
+		time.Since(l.inicioSerie).Seconds(), evento))
 }
 
 // livro:inicio laboratorio
 
 // NovoLaboratorio sobe três enxamed num banco novo, cada um falando com
-// o PostgreSQL pelo próprio proxy, espera as 512 partições terem dono
-// e conecta um worker remoto a cada nó. env acrescenta variáveis de
-// ambiente ao processo do nó i (de 1 a 3).
+// o PostgreSQL pelo próprio proxy, espera as 512 partições se dividirem
+// entre eles — o steady state de partida — e conecta um worker remoto a
+// cada nó. env acrescenta variáveis de ambiente ao processo do nó i (de
+// 1 a 3).
 func NovoLaboratorio(t *testing.T, bin Binarios,
 	env func(i int) []string) *Laboratorio {
 	l := &Laboratorio{T: t, Bin: bin, DSN: testutil.PostgresDSN(t),
@@ -105,11 +115,12 @@ func NovoLaboratorio(t *testing.T, bin Binarios,
 		n.cmd = l.processo(n.Log, vars, bin.Enxamed, args...)
 		l.Nos = append(l.Nos, n)
 	}
-	l.Esperar(30*time.Second, "as 512 partições com dono", func() bool {
-		return l.Contar(`SELECT count(*) FROM partition_lease
-			WHERE owner IS NOT NULL
-			  AND lease_expires_at > now()`) == 512
-	})
+	l.Esperar(30*time.Second, "as 512 partições divididas entre três",
+		func() bool {
+			p := l.Posses()
+			return len(p) == 3 && min(p["no-1"], p["no-2"],
+				p["no-3"]) >= 170
+		})
 	l.rodar(bin.Cluster, "preparar", "-dsn", l.DSN)
 	for _, n := range l.Nos {
 		n.worker = l.processo(filepath.Join(l.dir, "w-"+n.Nome+".log"),
@@ -278,6 +289,7 @@ func (l *Laboratorio) Amostrar(ctx context.Context,
 	var as []Amostra
 	pronto := make(chan struct{})
 	inicio := time.Now()
+	l.inicioSerie = inicio
 	go func() {
 		defer close(pronto)
 		for ctx.Err() == nil {
