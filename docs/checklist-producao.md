@@ -12,7 +12,7 @@ arquivo que diz sim ou não. A coluna "Enxame" é o estado na tag
 | 3 | Compila | Uma versão de Go só: `toolchain` no `go.mod`, a mesma na imagem de build e na CI | `go.mod`, `Dockerfile`, `go-version-file` | sim |
 | 4 | Compila | Nada para o `go fix` modernizar | `go fix -diff ./...` vazio | sim |
 | 5 | Passa nos testes | Testes de integração contra o banco de verdade, na CI | `make integration` | sim |
-| 6 | Passa nos testes | Uma suíte de contrato para toda interface com mais de uma implementação | `storetest`, `coordinator.Conformidade` | sim |
+| 6 | Passa nos testes | Uma suíte de contrato para toda interface com mais de uma implementação | `storetest`; `Conformidade` | sim |
 | 7 | Passa nos testes | Nenhum `time.Sleep` em teste; relógio injetável ou `synctest` | lint (`forbidigo`) | sim |
 | 8 | Passa nos testes | Fuzzing dos parsers, com o corpus guardado | `make fuzz`; job noturno | sim |
 | 9 | Livre de corridas | Todo teste roda com `-race` na CI | `make race` | sim |
