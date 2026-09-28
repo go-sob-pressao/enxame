@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 )
 
 // Middleware embrulha um handler com um comportamento transversal.
@@ -136,5 +138,18 @@ func anotarRota(prox http.Handler) http.Handler {
 			*rota = r.Pattern
 		}
 		prox.ServeHTTP(w, r)
+	})
+}
+
+// rastrear abre o span de servidor da rota; as públicas (saúde,
+// especificação) ficam de fora, para o trace não virar ruído.
+func rastrear(rota string, prox http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter,
+		r *http.Request) {
+		ctx, fim := tracing.IniciarRequisicao(r.Context(), r.Header,
+			rota)
+		rw := &comStatus{ResponseWriter: w, status: http.StatusOK}
+		prox.ServeHTTP(rw, r.WithContext(ctx))
+		fim(rw.status)
 	})
 }

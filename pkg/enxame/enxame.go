@@ -13,6 +13,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	nucleo "github.com/go-sob-pressao/enxame/internal/core/webhook"
+	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 	"github.com/go-sob-pressao/enxame/internal/store"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	"github.com/go-sob-pressao/enxame/pkg/webhook"
@@ -94,7 +95,7 @@ func (c *Client) InsertTx(
 	}
 	spec := job.Spec{ID: id.JobID(uuid.NewV7()),
 		Namespace: c.namespace, Queue: "default", Kind: a.Kind(),
-		Args: args}
+		Args: args, TraceParent: tracing.TraceParent(ctx)}
 	for _, o := range opts {
 		o(&spec)
 	}

@@ -74,6 +74,11 @@ func executar(args []string, saida, erros io.Writer) int {
 			"disto (0: desligado)")
 	fs.StringVar(&c.vooDir, "voo-dir", os.TempDir(),
 		"diretório dos traces do flight recorder")
+	fs.StringVar(&c.otlp, "otlp", os.Getenv("ENXAME_OTLP"),
+		"coletor OTLP/HTTP dos traces, ex. localhost:4318 (vazio: "+
+			"sem traces)")
+	fs.Float64Var(&c.amostragem, "amostragem", 1,
+		"fração dos traces novos que é guardada, de 0 a 1")
 	fs.StringVar(&c.diag, "diag", "",
 		"endereço dos perfis do pprof (desligado se vazio; use "+
 			"127.0.0.1:6060)")

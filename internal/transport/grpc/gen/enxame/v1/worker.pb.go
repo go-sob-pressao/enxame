@@ -129,14 +129,17 @@ func (x *FetchResponse) GetJob() *Job {
 }
 
 type Job struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Namespace     string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Queue         string                 `protobuf:"bytes,3,opt,name=queue,proto3" json:"queue,omitempty"`
-	Kind          string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
-	Args          []byte                 `protobuf:"bytes,5,opt,name=args,proto3" json:"args,omitempty"`
-	Attempt       int32                  `protobuf:"varint,6,opt,name=attempt,proto3" json:"attempt,omitempty"`
-	MaxAttempts   int32                  `protobuf:"varint,7,opt,name=max_attempts,json=maxAttempts,proto3" json:"max_attempts,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Namespace   string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Queue       string                 `protobuf:"bytes,3,opt,name=queue,proto3" json:"queue,omitempty"`
+	Kind        string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	Args        []byte                 `protobuf:"bytes,5,opt,name=args,proto3" json:"args,omitempty"`
+	Attempt     int32                  `protobuf:"varint,6,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	MaxAttempts int32                  `protobuf:"varint,7,opt,name=max_attempts,json=maxAttempts,proto3" json:"max_attempts,omitempty"`
+	// O contexto de trace W3C gravado com o job (Cap. 30): a tentativa,
+	// no worker, vira um span do trace de quem o enfileirou.
+	TraceParent   string `protobuf:"bytes,8,opt,name=trace_parent,json=traceParent,proto3" json:"trace_parent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -218,6 +221,13 @@ func (x *Job) GetMaxAttempts() int32 {
 		return x.MaxAttempts
 	}
 	return 0
+}
+
+func (x *Job) GetTraceParent() string {
+	if x != nil {
+		return x.TraceParent
+	}
+	return ""
 }
 
 type HeartbeatRequest struct {
@@ -434,7 +444,7 @@ const file_enxame_v1_worker_proto_rawDesc = "" +
 	"\x06queues\x18\x02 \x03(\tR\x06queues\x12\x16\n" +
 	"\x06credit\x18\x03 \x01(\x05R\x06credit\"1\n" +
 	"\rFetchResponse\x12 \n" +
-	"\x03job\x18\x01 \x01(\v2\x0e.enxame.v1.JobR\x03job\"\xae\x01\n" +
+	"\x03job\x18\x01 \x01(\v2\x0e.enxame.v1.JobR\x03job\"\xd1\x01\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
 	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x14\n" +
@@ -442,7 +452,8 @@ const file_enxame_v1_worker_proto_rawDesc = "" +
 	"\x04kind\x18\x04 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04args\x18\x05 \x01(\fR\x04args\x12\x18\n" +
 	"\aattempt\x18\x06 \x01(\x05R\aattempt\x12!\n" +
-	"\fmax_attempts\x18\a \x01(\x05R\vmaxAttempts\"C\n" +
+	"\fmax_attempts\x18\a \x01(\x05R\vmaxAttempts\x12!\n" +
+	"\ftrace_parent\x18\b \x01(\tR\vtraceParent\"C\n" +
 	"\x10HeartbeatRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x18\n" +
 	"\aattempt\x18\x02 \x01(\x05R\aattempt\"\x13\n" +

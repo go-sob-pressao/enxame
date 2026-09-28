@@ -18,6 +18,7 @@ type Spec struct {
 	Priority    int       // 1 (mais alta) a 4; zero vale 2
 	MaxAttempts int       // zero vale 25
 	RunAt       time.Time // zero: agora
+	TraceParent string    // contexto W3C de quem enfileirou (Cap. 30)
 }
 
 // Job é a projeção do estado corrente, derivada do histórico.
@@ -39,6 +40,7 @@ type Job struct {
 	HeartbeatAt time.Time // último batimento da tentativa corrente
 	FinalizedAt time.Time
 	LastError   string
+	TraceParent string // contexto W3C de quem enfileirou (Cap. 30)
 }
 
 const (

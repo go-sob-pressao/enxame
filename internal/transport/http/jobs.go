@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 	"github.com/go-sob-pressao/enxame/internal/store"
 )
 
@@ -53,7 +54,8 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 		recusarFilaCheia(w)
 		return
 	}
-	j, evs, err := novoJob(namespace(r.Context()), n)
+	j, evs, err := novoJob(namespace(r.Context()), n,
+		tracing.TraceParent(r.Context()))
 	if err != nil {
 		a.erro(w, r, fmt.Errorf("%w: %w", errEntrada, err))
 		return
@@ -72,7 +74,8 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 // novoJob monta o job e o evento de criação. Os instantes vão com a
 // precisão do banco, o microssegundo, para a resposta ser o que uma
 // leitura devolveria.
-func novoJob(ns string, n NovoJob) (job.Job, []job.Event, error) {
+func novoJob(ns string, n NovoJob,
+	traco string) (job.Job, []job.Event, error) {
 	args := []byte(n.Args)
 	if len(args) == 0 {
 		args = []byte("{}")
@@ -80,7 +83,8 @@ func novoJob(ns string, n NovoJob) (job.Job, []job.Event, error) {
 	spec := job.Spec{ID: id.JobID(uuid.NewV7()), Namespace: ns,
 		Queue: n.Queue, Kind: n.Kind, Args: args,
 		UniqueKey: n.UniqueKey, OrderingKey: n.OrderingKey,
-		RunAt: n.RunAt.Round(time.Microsecond)}
+		RunAt:       n.RunAt.Round(time.Microsecond),
+		TraceParent: traco}
 	evs, j, err := job.Insert(spec, time.Now().Round(time.Microsecond))
 	if err != nil {
 		return job.Job{}, nil, err

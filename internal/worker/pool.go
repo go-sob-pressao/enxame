@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 	"github.com/go-sob-pressao/enxame/internal/queue"
 	"github.com/go-sob-pressao/enxame/internal/worker/heartbeat"
 	"github.com/go-sob-pressao/enxame/internal/worker/runner"
@@ -197,8 +199,17 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 		MaxAttempts:    j.MaxAttempts,
 		IdempotencyKey: id.JobKey(j.Namespace, j.ID),
 	})
+	// livro:inicio observar-tentativa
+	// A tentativa ganha um span no trace de quem enfileirou o job, e a
+	// goroutine do handler, os rótulos do job: eles aparecem nos perfis
+	// e, desde o Go 1.27, no cabeçalho de cada goroutine de um
+	// traceback (Cap. 30).
+	tentativa, fimDoSpan := tracing.IniciarJob(tentativa, j)
+	tentativa = pprof.WithLabels(tentativa, pprof.Labels(
+		"job_id", j.ID.String(), "kind", j.Kind))
 	resultado := make(chan error, 1)
 	go func() {
+		pprof.SetGoroutineLabels(tentativa)
 		resultado <- runner.Call(tentativa, h, j)
 	}()
 
@@ -208,6 +219,8 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	case <-tentativa.Done():
 		err = context.Cause(tentativa)
 	}
+	fimDoSpan(err)
+	// livro:fim observar-tentativa
 	p.executados.Add(1)
 	if errors.Is(err, heartbeat.ErrPerdida) {
 		return p.perdida(j, err)

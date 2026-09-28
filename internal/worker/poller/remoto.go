@@ -199,5 +199,6 @@ func deProto(m *enxamev1.Job) (job.Job, error) {
 		Queue: m.GetQueue(), Kind: m.GetKind(), Args: m.GetArgs(),
 		Attempt:     int(m.GetAttempt()),
 		MaxAttempts: int(m.GetMaxAttempts()),
+		TraceParent: m.GetTraceParent(),
 		State:       job.StateRunning}, nil
 }

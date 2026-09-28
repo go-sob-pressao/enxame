@@ -42,6 +42,9 @@ message Job {
   bytes args = 5;
   int32 attempt = 6;
   int32 max_attempts = 7;
+  // O contexto de trace W3C gravado com o job (Cap. 30): a tentativa,
+  // no worker, vira um span do trace de quem o enfileirou.
+  string trace_parent = 8;
 }
 
 message HeartbeatRequest {

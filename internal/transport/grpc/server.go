@@ -179,5 +179,6 @@ func paraProto(j job.Job) *enxamev1.Job {
 		Queue: j.Queue, Kind: j.Kind, Args: j.Args,
 		Attempt:     int32(j.Attempt),     //nolint:gosec // cabe
 		MaxAttempts: int32(j.MaxAttempts), //nolint:gosec // cabe
+		TraceParent: j.TraceParent,
 	}
 }

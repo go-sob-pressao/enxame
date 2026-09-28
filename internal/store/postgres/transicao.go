@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 	"github.com/go-sob-pressao/enxame/internal/store"
 	"github.com/go-sob-pressao/enxame/pkg/workflow"
 )
@@ -87,6 +88,10 @@ func enfileirar(
 ) (job.Job, error) {
 	if spec.ID.IsZero() {
 		spec.ID = id.JobID(uuid.NewV7())
+	}
+	// O job novo continua o trace de quem o criou (Cap. 30).
+	if spec.TraceParent == "" {
+		spec.TraceParent = tracing.TraceParent(ctx)
 	}
 	evs, j, err := job.Insert(spec, at)
 	if err != nil {

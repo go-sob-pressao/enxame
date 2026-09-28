@@ -24,6 +24,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/delivery"
 	"github.com/go-sob-pressao/enxame/internal/engine/partition"
 	"github.com/go-sob-pressao/enxame/internal/observ"
+	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	tgrpc "github.com/go-sob-pressao/enxame/internal/transport/grpc"
 	enxamev1 "github.com/go-sob-pressao/enxame/internal/transport/grpc/gen/enxame/v1"
@@ -45,6 +46,8 @@ type config struct {
 	leaseMotor      time.Duration
 	relogio         func() time.Time // o relógio de parede do nó
 	diag            string           // endereço do pprof; vazio: não
+	otlp            string           // coletor OTLP/HTTP; vazio: não
+	amostragem      float64          // fração dos traces novos guardada
 	vooLimiar       time.Duration    // flight recorder; zero: desligado
 	vooDir          string
 }
@@ -64,6 +67,13 @@ func servir(
 	if c.relogio == nil {
 		c.relogio = time.Now
 	}
+	desligar, err := tracing.Iniciar(ctx, tracing.Config{
+		Servico: "enxamed", No: c.no, Endpoint: c.otlp,
+		Amostragem: c.amostragem})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = desligar(context.WithoutCancel(ctx)) }()
 	db, err := pgxpool.New(ctx, c.dsn)
 	if err != nil {
 		return err
