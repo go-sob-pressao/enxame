@@ -1,0 +1,42 @@
+# Alarmes do Enxame (Cap. 30). Cada um diz, na anotação, que painel
+# abrir e que pergunta fazer a seguir: um alarme que não leva à causa é
+# ruído (Regra 29).
+groups:
+  - name: enxame
+    rules:
+      - alert: AtrasoDeAgendamento
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, fila) (rate(enxame_job_atraso_segundos_bucket[5m])))
+            > 60
+        for: 5m
+        labels: {severidade: pagina}
+        annotations:
+          resumo: "p99 do atraso da fila {{ $labels.fila }} acima de 1 min"
+          proximo_passo: >-
+            Painel "Enxame", linha Filas: a fila está crescendo
+            (enxame_fila_esperando) ou só envelhecendo
+            (enxame_fila_mais_antigo_segundos)? Envelhecer sem crescer é
+            um job preso na cabeça de uma chave — abra o trace dele.
+      - alert: FilaEnvelhecendo
+        expr: max by (fila) (enxame_fila_mais_antigo_segundos) > 300
+        for: 5m
+        labels: {severidade: pagina}
+        annotations:
+          resumo: "o job mais antigo da fila {{ $labels.fila }} espera há mais de 5 min"
+          proximo_passo: >-
+            Painel "Enxame", linhas Filas e Tentativas: há tentativas
+            falhando nessa fila (resultado="retry")? Se sim, o trace de
+            uma delas mostra o erro; se não, olhe os workers e as
+            partições.
+      - alert: PoolDeConexoesEsgotado
+        expr: |
+          sum by (instance) (rate(enxame_db_esperas_total[5m])) > 1
+        for: 10m
+        labels: {severidade: ticket}
+        annotations:
+          resumo: "{{ $labels.instance }} esperando conexão do banco"
+          proximo_passo: >-
+            Painel "Enxame", linha Banco: conexões em uso no máximo? Se
+            o p99 das rotas subiu junto, é saturação; o perfil de
+            goroutines (-diag) mostra quem espera.
