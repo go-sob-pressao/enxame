@@ -69,9 +69,10 @@ chaos:           ## experimentos de caos contra cluster real (Cap. 28; make up)
 	$(GO) test -tags=chaos -count=1 -v -timeout=60m ./test/chaos/... \
 		$(if $(EXP),-run $(EXP))
 
-integration:     ## integração contra Postgres real (make up; ENXAME_DB_DSN)
+integration:     ## integração contra Postgres real (make up; ENXAME_DB_DSN); PULAR=Teste omite testes
 	@if ls test/integration/*_test.go >/dev/null 2>&1; then \
-		$(GO) test -tags=integration -count=1 ./test/integration/...; \
+		$(GO) test -tags=integration -count=1 ./test/integration/... \
+			$(if $(PULAR),-skip '$(PULAR)'); \
 	else echo "integration: SKIP — nenhum teste ainda; entram no Capítulo 12"; fi
 
 FUZZTIME ?= 30s

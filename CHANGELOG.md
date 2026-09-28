@@ -9,6 +9,17 @@ gRPC dos workers (`buf breaking` na CI) e para o esquema do banco, que só
 muda por migrações do tipo expandir e depois contrair. O que está em
 `internal/` pode mudar em qualquer versão.
 
+## [Não lançado]
+
+### Mudado
+
+- A CI deixa de rodar o Teste de Realidade #2 (`TestRealidade2`): num
+  runner compartilhado, o gerador de carga no mesmo processo leva o p99
+  da carga normal a ~140 ms, perto do limite de 32 requisições em curso,
+  e o teste reprovava por recusas depois da avalanche. Ele continua em
+  `make integration`, para a máquina de referência; `make integration
+  PULAR=<regex>` omite testes.
+
 ## [1.0.1] — 2026-09-28
 
 ### Mudado
