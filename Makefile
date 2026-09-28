@@ -9,7 +9,7 @@ LDFLAGS := -s -w -X main.versao=$(VERSAO)
 PKGS    := ./...
 
 .DEFAULT_GOAL := help
-.PHONY: help check build test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto openapi ferramentas-proto clean defeitos
+.PHONY: help check build reproduzivel imagem test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto openapi ferramentas-proto clean defeitos
 
 help:            ## lista os alvos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -19,6 +19,16 @@ check: lint arch race  ## o que a CI exige antes de qualquer tag de capítulo
 build:           ## compila os binários em bin/
 	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=false -ldflags '$(LDFLAGS)' -o bin/enxamed   ./cmd/enxamed
 	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=false -ldflags '$(LDFLAGS)' -o bin/enxamectl ./cmd/enxamectl
+
+reproduzivel:    ## compila duas vezes, em diretórios diferentes, e compara os binários
+	@a=$$(mktemp -d); b=$$(mktemp -d); \
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -buildvcs=false -ldflags '$(LDFLAGS)' -o $$a/enxamed ./cmd/enxamed && \
+	cp -R . $$b/src && (cd $$b/src && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -buildvcs=false -ldflags '$(LDFLAGS)' -o $$b/enxamed ./cmd/enxamed) && \
+	shasum -a 256 $$a/enxamed $$b/enxamed && \
+	[ "$$(shasum -a 256 < $$a/enxamed)" = "$$(shasum -a 256 < $$b/enxamed)" ] && echo "reproduzível"
+
+imagem:          ## constrói a imagem, sem publicar
+	docker build -f deploy/docker/Dockerfile --build-arg VERSAO=$(VERSAO) -t enxame:$(VERSAO) .
 
 test:            ## testes unitários
 	$(GO) test $(PKGS)
