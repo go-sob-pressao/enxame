@@ -1,0 +1,82 @@
+# Testes dos alarmes (Cap. 32): make alertas. Cada alarme que acorda
+# alguém tem um teste que o faz disparar, e um que confere que ele fica
+# quieto quando deve.
+rule_files: [alertas.yml]
+evaluation_interval: 30s
+
+tests:
+  # Um nó para de ter partições; dois minutos depois, o alarme.
+  - interval: 30s
+    input_series:
+      - series: enxame_particoes{instance="enxame-0"}
+        values: 171x20
+      - series: enxame_particoes{instance="enxame-1"}
+        values: 171x20
+      - series: enxame_particoes{instance="enxame-2"}
+        values: 170 170 0x18
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ParticaoSemDono
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ParticaoSemDono
+        exp_alerts:
+          - exp_labels: {severidade: pagina}
+            exp_annotations:
+              resumo: "342 de 512 partições com dono"
+              runbook: docs/runbook/particao-sem-dono.md
+              proximo_passo: >-
+                O trabalho das partições sem dono espera no banco. O mapa
+                aponta para um nó que parou de bater, ou um nó vivo não
+                consegue adquirir? O runbook tem as três consultas.
+
+  # 10% de erro ao enfileirar é 100 vezes o orçamento: página.
+  - interval: 1m
+    input_series:
+      - series: enxame_http_requisicoes_total{rota="POST /v1/jobs",status="201"}
+        values: 0+540x120
+      - series: enxame_http_requisicoes_total{rota="POST /v1/jobs",status="503"}
+        values: 0+60x120
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: OrcamentoQueimandoRapido
+        exp_alerts:
+          - exp_labels: {severidade: pagina, slo: enfileirar}
+            exp_annotations:
+              resumo: "SLO enfileirar: 2% do orçamento do mês em 1 h"
+              runbook: docs/runbook/orcamento-de-erro.md
+
+  # 0,1% de erro gasta o orçamento no ritmo exato do mês: nenhum
+  # alarme, nem o de ticket.
+  - interval: 1m
+    input_series:
+      - series: enxame_http_requisicoes_total{rota="POST /v1/workflows",status="201"}
+        values: 0+999x480
+      - series: enxame_http_requisicoes_total{rota="POST /v1/workflows",status="500"}
+        values: 0+1x480
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: OrcamentoQueimandoRapido
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: OrcamentoQueimandoDevagar
+        exp_alerts: []
+
+  # 1% de erro, dez vezes o ritmo: o ticket, não a página.
+  - interval: 1m
+    input_series:
+      - series: enxame_http_requisicoes_total{rota="POST /v1/jobs",status="201"}
+        values: 0+990x480
+      - series: enxame_http_requisicoes_total{rota="POST /v1/jobs",status="500"}
+        values: 0+10x480
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: OrcamentoQueimandoRapido
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: OrcamentoQueimandoDevagar
+        exp_alerts:
+          - exp_labels: {severidade: ticket, slo: enfileirar}
+            exp_annotations:
+              resumo: "SLO enfileirar: 5% do orçamento do mês em 6 h"
+              runbook: docs/runbook/orcamento-de-erro.md

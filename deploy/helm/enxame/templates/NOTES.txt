@@ -1,0 +1,6 @@
+O Enxame sobe com {{ .Values.replicas }} nós. Os workers remotos precisam
+de um stream para cada um (Cap. 32):
+
+  -grpc={{ include "enxame.nos" . }}
+
+A API: http://{{ .Release.Name }}:8080 dentro do cluster.

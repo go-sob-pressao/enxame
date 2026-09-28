@@ -59,6 +59,25 @@
         ],
         "type": "object"
       },
+      "Estado": {
+        "properties": {
+          "banco": {
+            "type": "string"
+          },
+          "banco_ms": {
+            "type": "integer"
+          },
+          "particoes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "banco",
+          "banco_ms",
+          "particoes"
+        ],
+        "type": "object"
+      },
       "EstadoEndpoint": {
         "properties": {
           "breaker": {
@@ -341,6 +360,23 @@
           }
         },
         "summary": "aceita tráfego"
+      }
+    },
+    "/statusz": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Estado"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "o que o nó vê das dependências; não é probe"
       }
     },
     "/v1/cluster/members": {

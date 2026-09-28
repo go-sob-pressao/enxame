@@ -47,6 +47,9 @@ func executar(args []string, saida, erros io.Writer) int {
 	fs.StringVar(&c.http, "http", ":8080", "endereço da API HTTP")
 	fs.StringVar(&c.grpc, "grpc", ":7233",
 		"endereço do gRPC dos workers")
+	fs.StringVar(&c.anunciar, "anunciar", "",
+		"endereço da API que os outros nós usam para chegar a este "+
+			"(padrão: o de -http)")
 	tokens := fs.String("tokens", os.Getenv("ENXAME_TOKENS"),
 		"token:namespace,… da API (ENXAME_TOKENS)")
 	fs.StringVar(&c.tokenWorker, "worker-token",

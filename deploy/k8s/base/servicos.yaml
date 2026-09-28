@@ -1,0 +1,24 @@
+# A API e o gRPC, para os clientes: qualquer nó serve.
+apiVersion: v1
+kind: Service
+metadata:
+  name: enxame
+spec:
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+    - {name: grpc, port: 7233, targetPort: grpc}
+---
+# Os nós, um a um: enxame-0.enxame-nos, enxame-1.enxame-nos… É o nome
+# que cada nó anuncia aos outros e o que os workers usam para ligar a
+# cada um. Sem clusterIP, e com o endereço publicado antes de o nó
+# ficar pronto: os nós precisam se achar para ficar prontos.
+apiVersion: v1
+kind: Service
+metadata:
+  name: enxame-nos
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+    - {name: grpc, port: 7233, targetPort: grpc}

@@ -1,0 +1,12 @@
+# No máximo um enxamed fora por vez numa interrupção voluntária — a
+# drenagem de um nó do Kubernetes, por exemplo. Não vale para a
+# atualização do StatefulSet, que tem a própria regra (um por vez). O
+# seletor é explícito: sem ele, o orçamento não protege pod nenhum.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: enxame
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: enxamed}

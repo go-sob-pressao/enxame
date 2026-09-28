@@ -1,0 +1,21 @@
+# Os valores do chart do Enxame (Cap. 32). O que depende de outro valor
+# é calculado no template, e não repetido aqui: o GOMEMLIMIT sai da
+# memória; o prazo de término, do preStop e do -prazo.
+
+imagem:
+  repositorio: ghcr.io/go-sob-pressao/enxame
+  tag: ""          # vazio: a appVersion do chart
+
+replicas: 3
+
+# O Secret com dsn, tokens e worker-token. O chart não o cria: segredo
+# não mora em values.yaml.
+segredo: enxame
+
+memoriaMiB: 512    # pedido e limite; GOMEMLIMIT = 90%
+cpuPedido: 500m    # sem limite de CPU: ver o Cap. 32
+
+preStopSegundos: 5
+prazoSegundos: 20  # -prazo: teto para drenar as requisições
+
+metricas: true     # /metrics na porta 9090

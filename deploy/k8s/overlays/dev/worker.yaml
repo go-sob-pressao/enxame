@@ -1,0 +1,25 @@
+# O worker do Teste de Realidade #4: sem estado, um Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: worker}
+  template:
+    metadata:
+      labels: {app: worker}
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: realidade4:dev
+          args:
+            - worker
+            - -grpc=enxame-0.enxame-nos:7233,enxame-1.enxame-nos:7233,enxame-2.enxame-nos:7233
+          env:
+            - name: ENXAME_DB_DSN
+              valueFrom: {secretKeyRef: {name: enxame, key: dsn}}
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}

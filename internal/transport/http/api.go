@@ -33,6 +33,7 @@ type API struct {
 	Cluster      Cluster    // nil com um nó só
 	Rota         Roteador   // nil com um nó só
 	Entrega      Entrega    // o estado em memória da entrega
+	Particoes    func() int // quantas partições o nó tem; nil: 0
 	// encerrando é fechado quando o servidor começa a desligar: os
 	// long-polls param de esperar.
 	encerrando chan struct{}

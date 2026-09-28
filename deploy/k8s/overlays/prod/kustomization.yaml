@@ -1,0 +1,14 @@
+# O Enxame em produção: a imagem publicada, pela versão, e o banco fora
+# do cluster. O Secret "enxame" (dsn, tokens, worker-token) é criado
+# fora deste repositório — por um operador de segredos, por exemplo.
+#
+#	kubectl apply -k deploy/k8s/overlays/prod
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: enxame
+resources:
+  - ../../base
+images:
+  - name: enxame
+    newName: ghcr.io/go-sob-pressao/enxame
+    newTag: v1.0.0

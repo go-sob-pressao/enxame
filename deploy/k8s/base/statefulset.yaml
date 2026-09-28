@@ -1,0 +1,84 @@
+# livro:inicio statefulset
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: enxame
+spec:
+  serviceName: enxame-nos
+  replicas: 3
+  # Os três sobem juntos; a atualização continua um por vez.
+  podManagementPolicy: Parallel
+  template:
+    spec:
+      # 5 s de preStop + 20 s de -prazo + folga para o motor e o gRPC.
+      terminationGracePeriodSeconds: 40
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels: {app.kubernetes.io/name: enxamed}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: enxamed
+          image: enxame:dev
+          args:
+            - -no=$(POD_NAME)
+            - -anunciar=$(POD_NAME).enxame-nos:8080
+            - -metricas=:9090
+            - -aviso=0s # o preStop já espera
+          env:
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: ENXAME_DB_DSN
+              valueFrom: {secretKeyRef: {name: enxame, key: dsn}}
+            - name: ENXAME_TOKENS
+              valueFrom: {secretKeyRef: {name: enxame, key: tokens}}
+            - name: ENXAME_WORKER_TOKEN
+              valueFrom:
+                secretKeyRef: {name: enxame, key: worker-token}
+            # 90% do limite de memória: o coletor aperta antes de o
+            # kernel matar. Mude os dois juntos.
+            - name: GOMEMLIMIT
+              value: 460MiB
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: grpc, containerPort: 7233}
+            - {name: metricas, containerPort: 9090}
+          # Sem limite de CPU: o GOMAXPROCS segue o limite, e um limite
+          # baixo vira pausas de throttling no p99. O pedido reserva.
+          resources:
+            requests: {cpu: 500m, memory: 512Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          # livro:inicio probes
+          # Subir: migrar e entrar no cluster; até 60 s.
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          # Receber tráfego: não está desligando.
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          # Continuar vivo: o processo responde. Nunca o banco.
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # livro:fim probes
+          # livro:inicio prestop
+          # Sair da rotação antes de parar: o Endpoint sai quando o pod
+          # entra em Terminating, mas cada nó do cluster leva um tempo
+          # para saber. Sem shell na imagem, a espera é do kubelet.
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
+          # livro:fim prestop
+# livro:fim statefulset

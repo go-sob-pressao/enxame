@@ -1,0 +1,19 @@
+# Cluster local do Capítulo 32: um plano de controle e três nós, para
+# que os três enxamed fiquem em máquinas diferentes. A API responde em
+# localhost:30080 e o PostgreSQL do overlay dev em localhost:30432
+# (NodePort).
+#
+#	kind create cluster --config deploy/k8s/kind.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: enxame
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 30080
+      - containerPort: 30432
+        hostPort: 30432
+  - role: worker
+  - role: worker
+  - role: worker

@@ -1,6 +1,6 @@
-# Alarmes do Enxame (Cap. 30). Cada um diz, na anotação, que painel
-# abrir e que pergunta fazer a seguir: um alarme que não leva à causa é
-# ruído (Regra 29).
+# Alarmes do Enxame (Caps. 30 e 32). Cada um diz, na anotação, que
+# painel abrir e que pergunta fazer a seguir — um alarme que não leva à
+# causa é ruído (Regra 29) — e aponta o runbook (docs/runbook).
 groups:
   - name: enxame
     rules:
@@ -13,6 +13,7 @@ groups:
         labels: {severidade: pagina}
         annotations:
           resumo: "p99 do atraso da fila {{ $labels.fila }} acima de 1 min"
+          runbook: docs/runbook/fila-crescendo.md
           proximo_passo: >-
             Painel "Enxame", linha Filas: a fila está crescendo
             (enxame_fila_esperando) ou só envelhecendo
@@ -24,6 +25,7 @@ groups:
         labels: {severidade: pagina}
         annotations:
           resumo: "o job mais antigo da fila {{ $labels.fila }} espera há mais de 5 min"
+          runbook: docs/runbook/fila-crescendo.md
           proximo_passo: >-
             Painel "Enxame", linhas Filas e Tentativas: há tentativas
             falhando nessa fila (resultado="retry")? Se sim, o trace de
@@ -36,7 +38,95 @@ groups:
         labels: {severidade: ticket}
         annotations:
           resumo: "{{ $labels.instance }} esperando conexão do banco"
+          runbook: docs/runbook/pool-de-conexoes.md
           proximo_passo: >-
             Painel "Enxame", linha Banco: conexões em uso no máximo? Se
             o p99 das rotas subiu junto, é saturação; o perfil de
             goroutines (-diag) mostra quem espera.
+      - alert: ParticaoSemDono
+        expr: sum(enxame_particoes) < 512
+        for: 2m
+        labels: {severidade: pagina}
+        annotations:
+          resumo: "{{ $value }} de 512 partições com dono"
+          runbook: docs/runbook/particao-sem-dono.md
+          proximo_passo: >-
+            O trabalho das partições sem dono espera no banco. O mapa
+            aponta para um nó que parou de bater, ou um nó vivo não
+            consegue adquirir? O runbook tem as três consultas.
+      - alert: LiderOscilando
+        expr: max(enxame_mapa_epoca) - max(enxame_mapa_epoca offset 10m) > 5
+        labels: {severidade: ticket}
+        annotations:
+          resumo: "o mapa de partições mudou {{ $value }} vezes em 10 min"
+          runbook: docs/runbook/lider-oscilando.md
+          proximo_passo: >-
+            Um nó entrando e saindo — reinícios, pausas longas? Os
+            RESTARTS dos pods e o silêncio de cada membro respondem.
+
+  # livro:inicio slo
+  # Os SLOs de docs/slo.md. Cada regra grava a fração de eventos ruins
+  # numa janela; os alarmes comparam essa fração com o orçamento — 0,1%
+  # para enfileirar, 1% para latência e pontualidade.
+  - name: enxame-slo
+    rules:
+      - record: enxame:slo_ruins:razao5m
+        labels: {slo: enfileirar}
+        expr: |
+          sum(rate(enxame_http_requisicoes_total{
+                rota=~"POST /v1/(jobs|workflows)", status=~"5.."}[5m]))
+          / sum(rate(enxame_http_requisicoes_total{
+                rota=~"POST /v1/(jobs|workflows)"}[5m]))
+      - record: enxame:slo_ruins:razao5m
+        labels: {slo: latencia}
+        expr: |
+          1 - sum(rate(enxame_http_duracao_segundos_bucket{
+                    rota="POST /v1/jobs", le="0.1"}[5m]))
+            / sum(rate(enxame_http_duracao_segundos_count{
+                    rota="POST /v1/jobs"}[5m]))
+      - record: enxame:slo_ruins:razao5m
+        labels: {slo: pontualidade}
+        expr: |
+          1 - sum(rate(enxame_job_atraso_segundos_bucket{le="5"}[5m]))
+            / sum(rate(enxame_job_atraso_segundos_count[5m]))
+      - record: enxame:slo_orcamento
+        labels: {slo: enfileirar}
+        expr: vector(0.001)
+      - record: enxame:slo_orcamento
+        labels: {slo: latencia}
+        expr: vector(0.01)
+      - record: enxame:slo_orcamento
+        labels: {slo: pontualidade}
+        expr: vector(0.01)
+      # As janelas longas são médias da de 5 min.
+      - record: enxame:slo_ruins:razao1h
+        expr: avg_over_time(enxame:slo_ruins:razao5m[1h])
+      - record: enxame:slo_ruins:razao30m
+        expr: avg_over_time(enxame:slo_ruins:razao5m[30m])
+      - record: enxame:slo_ruins:razao6h
+        expr: avg_over_time(enxame:slo_ruins:razao5m[6h])
+      # Queimar 2% do orçamento do mês em 1 hora é 14,4 vezes o ritmo
+      # que o gasta em 30 dias; a janela de 5 min confirma que ainda
+      # está queimando, e o alarme para logo que para.
+      - alert: OrcamentoQueimandoRapido
+        expr: |
+          enxame:slo_ruins:razao1h
+              > on (slo) 14.4 * enxame:slo_orcamento
+          and enxame:slo_ruins:razao5m
+              > on (slo) 14.4 * enxame:slo_orcamento
+        labels: {severidade: pagina}
+        annotations:
+          resumo: "SLO {{ $labels.slo }}: 2% do orçamento do mês em 1 h"
+          runbook: docs/runbook/orcamento-de-erro.md
+      # 5% em 6 horas: 6 vezes o ritmo. Não acorda ninguém.
+      - alert: OrcamentoQueimandoDevagar
+        expr: |
+          enxame:slo_ruins:razao6h
+              > on (slo) 6 * enxame:slo_orcamento
+          and enxame:slo_ruins:razao30m
+              > on (slo) 6 * enxame:slo_orcamento
+        labels: {severidade: ticket}
+        annotations:
+          resumo: "SLO {{ $labels.slo }}: 5% do orçamento do mês em 6 h"
+          runbook: docs/runbook/orcamento-de-erro.md
+  # livro:fim slo

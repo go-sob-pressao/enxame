@@ -3,7 +3,7 @@
 Quarenta itens, quatro por degrau da escada *Compila ≠ Está correto*
 (Capítulo 31). Cada item é verificável: um comando, um teste ou um
 arquivo que diz sim ou não. A coluna "Enxame" é o estado na tag
-`cap-31`; "Cap. 32" quer dizer que o item fica para o capítulo seguinte.
+`cap-32`.
 
 | # | Degrau | Item | Como se verifica | Enxame |
 |---|---|---|---|---|
@@ -42,8 +42,8 @@ arquivo que diz sim ou não. A coluna "Enxame" é o estado na tag
 | 33 | Observável | Traces com o contexto gravado no job | `trace_parent`, `TestTraceAtravessaOBanco` | sim |
 | 34 | Observável | Métricas RED, USE e de domínio, sem rótulo de cardinalidade ilimitada | `/metrics`, revisão dos rótulos | sim |
 | 35 | Observável | Logs estruturados com `trace_id` e `job_id` | `logging.Correlacao` | sim |
-| 36 | Observável | Todo alarme diz o próximo passo | `alertas.yml` | sim |
+| 36 | Observável | Todo alarme diz o próximo passo, e tem teste | `alertas.yml`, `make alertas` | sim |
 | 37 | Operável | Imagem mínima, sem root, com SBOM e proveniência | `Dockerfile`, `release.yaml` | sim |
-| 38 | Operável | Probes de vida e de prontidão que dizem a verdade | `/healthz`, `/readyz` | parcial: o `/readyz` não confere o banco (Cap. 32) |
-| 39 | Operável | Limites de CPU e memória coerentes com `GOMAXPROCS` e `GOMEMLIMIT` | manifestos do cluster | Cap. 32 |
-| 40 | Operável | SLO, runbook e postmortem para cada alarme | `docs/` | Cap. 32 |
+| 38 | Operável | Probes que dizem a verdade: nenhuma depende de uma dependência compartilhada | `statefulset.yaml`, `TestStatusz` | sim |
+| 39 | Operável | Memória com limite e `GOMEMLIMIT` abaixo dele; CPU pedida, e o `GOMAXPROCS` que o runtime leu no log | `statefulset.yaml`, log "no ar" | sim |
+| 40 | Operável | SLO, runbook para cada alarme, dono declarado e modelo de postmortem | `docs/slo.md`, `docs/runbook/`, `docs/dono.md` | sim |

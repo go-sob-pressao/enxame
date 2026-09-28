@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"math/rand/v2"
 	"net"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,6 +40,7 @@ import (
 
 type config struct {
 	dsn, http, grpc string
+	anunciar        string // endereço da API para os outros nós
 	tokens          map[string]string
 	tokenWorker     string
 	aviso, prazo    time.Duration
@@ -81,7 +85,7 @@ func servir(
 		return err
 	}
 	defer db.Close()
-	if err := postgres.Migrate(ctx, db); err != nil {
+	if err := migrarQuandoDer(ctx, db, log); err != nil {
 		return err
 	}
 	// Um relógio só para todos os nós: o do banco (Caps. 22 e 24).
@@ -90,7 +94,8 @@ func servir(
 	no := nomeDoNo(c.no)
 
 	m := membership.Novo(membership.Config{No: no,
-		Endereco: anunciado(lisHTTP.Addr()), DB: db, Log: log})
+		Endereco: cmp.Or(c.anunciar, anunciado(lisHTTP.Addr())),
+		DB:       db, Log: log})
 	g.Go(func() error { return m.Run(ctx) })
 
 	// Quem manda e de quem é cada partição (Caps. 23 a 26): o pgcoord
@@ -134,6 +139,7 @@ func servir(
 	d := delivery.Novo(sd)
 	a := api.NovaAPI(db, c.tokens, log)
 	a.Cluster, a.Entrega = m, d
+	a.Particoes = func() int { return len(posses.Tokens()) }
 	a.Rota = routing.Rota{No: no, Coord: coord,
 		Tenho: func(p int) bool {
 			_, ok := posses.Tokens()[p]
@@ -196,7 +202,10 @@ func servir(
 	}
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
-		slog.String("grpc", lisGRPC.Addr().String()))
+		slog.String("grpc", lisGRPC.Addr().String()),
+		// O que o runtime leu do contêiner (Cap. 32).
+		slog.Int("gomaxprocs", runtime.GOMAXPROCS(0)),
+		slog.Int64("gomemlimit", debug.SetMemoryLimit(-1)))
 	if err := g.Wait(); !errors.Is(err, context.Canceled) {
 		return err
 	}
@@ -204,6 +213,38 @@ func servir(
 }
 
 // livro:fim servir
+
+// livro:inicio migrar-quando-der
+
+// migrarQuandoDer espera o banco aceitar conexões e aplica as
+// migrações. Um nó que sobe antes do banco — o que num cluster novo
+// acontece sempre — espera, em vez de sair com erro: sair faria o
+// kubelet reiniciá-lo com esperas cada vez maiores, e ele demoraria a
+// subir muito depois de o banco estar pronto. Quem limita a espera é
+// a startupProbe.
+func migrarQuandoDer(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	log *slog.Logger,
+) error {
+	espera := 500 * time.Millisecond
+	for {
+		err := postgres.Migrate(ctx, db)
+		if err == nil || ctx.Err() != nil {
+			return err
+		}
+		log.WarnContext(ctx, "esperando o banco",
+			slog.Any("erro", err), slog.Duration("espera", espera))
+		select {
+		case <-time.After(espera):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		espera = min(2*espera, 5*time.Second)
+	}
+}
+
+// livro:fim migrar-quando-der
 
 // anunciado é o endereço que os outros nós e os clientes usam: sem
 // host, o da máquina local.

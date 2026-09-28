@@ -1,0 +1,20 @@
+# O incidente do Capítulo 32, reproduzível: a liveness aponta para o
+# /statusz, que consulta o banco, e foi apertada — a cada 2 s, uma
+# falha basta — "para matar mais depressa um pod travado".
+#
+#	kubectl apply -k examples/cap32/incidente
+#	examples/cap32/incidente/piscar.sh 2    # o banco congela por 2 s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../deploy/k8s/overlays/dev
+patches:
+  - target: {kind: StatefulSet, name: enxame}
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/livenessProbe
+        value:
+          httpGet: {path: /statusz, port: http}
+          periodSeconds: 2
+          timeoutSeconds: 1
+          failureThreshold: 1

@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{- include "enxame.rotulos" . | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}-nos
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels: {{- include "enxame.rotulos" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "enxame.rotulos" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: {{ add .Values.preStopSegundos .Values.prazoSegundos 15 }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels: {{- include "enxame.rotulos" . | nindent 14 }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: enxamed
+          image: "{{ .Values.imagem.repositorio }}:{{ .Values.imagem.tag | default .Chart.AppVersion }}"
+          args:
+            - -no=$(POD_NAME)
+            - -anunciar=$(POD_NAME).{{ .Release.Name }}-nos:8080
+            - -aviso=0s
+            - -prazo={{ .Values.prazoSegundos }}s
+            {{- if .Values.metricas }}
+            - -metricas=:9090
+            {{- end }}
+          env:
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: ENXAME_DB_DSN
+              valueFrom: {secretKeyRef: {name: {{ .Values.segredo }}, key: dsn}}
+            - name: ENXAME_TOKENS
+              valueFrom: {secretKeyRef: {name: {{ .Values.segredo }}, key: tokens}}
+            - name: ENXAME_WORKER_TOKEN
+              valueFrom: {secretKeyRef: {name: {{ .Values.segredo }}, key: worker-token}}
+            - name: GOMEMLIMIT
+              value: {{ div (mul .Values.memoriaMiB 9) 10 }}MiB
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: grpc, containerPort: 7233}
+            - {name: metricas, containerPort: 9090}
+          resources:
+            requests: {cpu: {{ .Values.cpuPedido }}, memory: {{ .Values.memoriaMiB }}Mi}
+            limits: {memory: {{ .Values.memoriaMiB }}Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              sleep: {seconds: {{ .Values.preStopSegundos }}}

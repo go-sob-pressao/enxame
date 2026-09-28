@@ -1,0 +1,19 @@
+# O Enxame no kind (Cap. 32): o PostgreSQL dentro do cluster, a API e o
+# banco em NodePort, e o worker do Teste de Realidade #4.
+#
+#	kind create cluster --config deploy/k8s/kind.yaml
+#	make imagem VERSAO=dev && kind load docker-image enxame:dev -n enxame
+#	kubectl apply -k deploy/k8s/overlays/dev
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - postgres.yaml
+  - worker.yaml
+  - nodeport.yaml
+secretGenerator:
+  - name: enxame
+    literals:
+      - dsn=postgres://postgres:enxame@postgres:5432/enxame?sslmode=disable
+      - tokens=t1:loja
+      - worker-token=w

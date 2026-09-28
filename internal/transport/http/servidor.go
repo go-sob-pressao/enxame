@@ -21,6 +21,38 @@ func (a *API) pronto(w http.ResponseWriter, _ *http.Request) {
 	escrever(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// livro:inicio statusz
+
+// estado responde o que o nó vê das dependências: se o banco responde,
+// em quanto tempo, e quantas partições o nó tem. É para quem investiga
+// — o runbook manda abrir —, nunca para uma probe: o banco fora do ar
+// é o mesmo para todos os nós, e reiniciar um nó não o traz de volta.
+func (a *API) estado(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+	defer cancel()
+	e := Estado{Banco: "ok"}
+	inicio := time.Now()
+	err := a.DB.Ping(ctx)
+	e.BancoMs = time.Since(inicio).Milliseconds()
+	if a.Particoes != nil {
+		e.Particoes = a.Particoes()
+	}
+	status := http.StatusOK
+	if err != nil {
+		e.Banco, status = err.Error(), http.StatusServiceUnavailable
+	}
+	escrever(w, status, e)
+}
+
+// livro:fim statusz
+
+// Estado é o corpo do /statusz.
+type Estado struct {
+	Banco     string `json:"banco"`
+	BancoMs   int64  `json:"banco_ms"`
+	Particoes int    `json:"particoes"`
+}
+
 // Desligamento configura o encerramento gracioso.
 type Desligamento struct {
 	// Aviso é quanto tempo o /readyz responde 503 antes de o servidor

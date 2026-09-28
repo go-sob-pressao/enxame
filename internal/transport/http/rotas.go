@@ -59,6 +59,10 @@ func (a *API) Rotas() []Rota {
 			Status: 200, Publica: true, handler: a.vivo},
 		{Padrao: "GET /readyz", Resumo: "aceita tráfego",
 			Status: 200, Publica: true, handler: a.pronto},
+		{Padrao: "GET /statusz",
+			Resumo: "o que o nó vê das dependências; não é probe",
+			Saida:  Estado{}, Status: 200, Publica: true,
+			handler: a.estado},
 	}
 }
 

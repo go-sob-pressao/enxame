@@ -75,6 +75,24 @@ jobs:
           file: deploy/docker/Dockerfile
           push: false
 
+  operacao:
+    runs-on: ubuntu-latest
+    env:
+      HELM: helm-v4.3.0-linux-amd64.tar.gz
+      HELM_SHA256: >-
+        86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb
+    steps:
+      - uses: actions/checkout@v7
+      - name: Helm na versão fixada
+        run: |
+          curl -fsSLO "https://get.helm.sh/$HELM"
+          echo "$HELM_SHA256  $HELM" | sha256sum -c
+          tar xzf "$HELM" && sudo mv linux-amd64/helm /usr/local/bin/
+      - name: Manifestos e chart
+        run: make manifestos
+      - name: Alarmes testados
+        run: make alertas
+
   proto:
     runs-on: ubuntu-latest
     steps:

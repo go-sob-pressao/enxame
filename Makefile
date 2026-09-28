@@ -9,7 +9,7 @@ LDFLAGS := -s -w -X main.versao=$(VERSAO)
 PKGS    := ./...
 
 .DEFAULT_GOAL := help
-.PHONY: help check build reproduzivel imagem test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto openapi ferramentas-proto clean defeitos
+.PHONY: help check build reproduzivel imagem manifestos alertas realidade4 test race lint fmt arch vuln sim chaos integration fuzz cover fix tidy up down proto openapi ferramentas-proto clean defeitos
 
 help:            ## lista os alvos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -29,6 +29,19 @@ reproduzivel:    ## compila duas vezes, em diretórios diferentes, e compara os 
 
 imagem:          ## constrói a imagem, sem publicar
 	docker build -f deploy/docker/Dockerfile --build-arg VERSAO=$(VERSAO) -t enxame:$(VERSAO) .
+
+manifestos:      ## confere os manifestos do Kubernetes e o chart (Cap. 32)
+	kubectl kustomize deploy/k8s/overlays/dev >/dev/null
+	kubectl kustomize deploy/k8s/overlays/prod >/dev/null
+	helm lint deploy/helm/enxame
+
+PROMETHEUS ?= prom/prometheus:v3.14.0
+alertas:         ## valida as regras e roda os testes dos alarmes (Cap. 32)
+	docker run --rm -v $(CURDIR)/deploy/docker:/r -w /r --entrypoint promtool \
+		$(PROMETHEUS) test rules alertas_test.yml
+
+realidade4:      ## Teste de Realidade #4 no kind (Cap. 32; kind, kubectl, docker)
+	./examples/cap32/realidade4/rodar.sh
 
 test:            ## testes unitários
 	$(GO) test $(PKGS)

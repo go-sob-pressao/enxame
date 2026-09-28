@@ -17,10 +17,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -ldflags="-s -w -X main.versao=${VERSAO}" \
       -o /out/enxamed ./cmd/enxamed
 
-# Sem shell, sem gerenciador de pacotes, sem root: só o binário.
+# Sem shell, sem gerenciador de pacotes, sem root: só o binário. O
+# usuário é o número (65532 é o nonroot da distroless): o Kubernetes só
+# confere runAsNonRoot num usuário numérico (Cap. 32).
 FROM gcr.io/distroless/static-debian13:nonroot
 COPY --from=build /out/enxamed /enxamed
-USER nonroot:nonroot
+USER 65532:65532
 # 7233 gRPC (workers e nós) · 8080 API HTTP · 9090 métricas e pprof
 EXPOSE 7233 8080 9090
 ENTRYPOINT ["/enxamed"]
