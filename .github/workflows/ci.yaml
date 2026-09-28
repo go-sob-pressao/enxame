@@ -27,8 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
+        # A versão de Go tem uma única fonte: o go.mod.
         with:
-          go-version-file: go.mod      # a versão de Go tem uma única fonte: o go.mod
+          go-version-file: go.mod
           cache: true
 
       - name: go.mod e go.sum em dia
@@ -51,7 +52,8 @@ jobs:
       - name: Integração
         run: make integration
         env:
-          ENXAME_DB_DSN: postgres://postgres:enxame@localhost:5432/enxame?sslmode=disable
+          ENXAME_DB_DSN: "postgres://postgres:enxame@localhost:5432/\
+            enxame?sslmode=disable"
 
       - name: Vulnerabilidades
         run: make vuln
