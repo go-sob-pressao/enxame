@@ -1,24 +1,16 @@
 package http
 
-import (
-	"regexp"
-	"strings"
-)
+import "slices"
 
-// livro:inicio missao-06
+// livro:inicio missao-06-gabarito
 
 // kindPermitido diz se o kind está na lista de kinds que a API aceita.
-// A lista vem da configuração (-kinds); vazia, aceita qualquer um.
+// A lista vem da configuração (-kinds); vazia, aceita qualquer um. Uma
+// busca na lista, sem expressão regular: quatrocentas comparações de
+// string custam menos que montar e compilar uma expressão a cada
+// requisição, e não alocam nada.
 func kindPermitido(kinds []string, kind string) bool {
-	if len(kinds) == 0 {
-		return true
-	}
-	partes := make([]string, len(kinds))
-	for i, k := range kinds {
-		partes[i] = regexp.QuoteMeta(k)
-	}
-	re := regexp.MustCompile("^(" + strings.Join(partes, "|") + ")$")
-	return re.MatchString(kind)
+	return len(kinds) == 0 || slices.Contains(kinds, kind)
 }
 
-// livro:fim missao-06
+// livro:fim missao-06-gabarito
