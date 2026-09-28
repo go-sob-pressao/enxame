@@ -17,8 +17,8 @@ help:            ## lista os alvos
 check: lint arch race  ## o que a CI exige antes de qualquer tag de capítulo
 
 build:           ## compila os binários em bin/
-	$(GO) build -trimpath -ldflags '$(LDFLAGS)' -o bin/enxamed   ./cmd/enxamed
-	$(GO) build -trimpath -ldflags '$(LDFLAGS)' -o bin/enxamectl ./cmd/enxamectl
+	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=false -ldflags '$(LDFLAGS)' -o bin/enxamed   ./cmd/enxamed
+	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=false -ldflags '$(LDFLAGS)' -o bin/enxamectl ./cmd/enxamectl
 
 test:            ## testes unitários
 	$(GO) test $(PKGS)

@@ -1,0 +1,10 @@
+# O contexto do build é só o que o binário precisa: sem histórico, sem
+# binários locais, sem saídas de teste (Cap. 31).
+.git
+.github
+bin
+dist
+**/testdata
+**/telemetria
+test/simulation/failures
+*.out
