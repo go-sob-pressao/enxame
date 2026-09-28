@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
 	"github.com/go-sob-pressao/enxame/internal/store"
-	"github.com/go-sob-pressao/enxame/pkg/enxame"
 )
 
 // brutos são argumentos que chegam prontos em JSON.
@@ -24,6 +26,13 @@ func (b brutos) MarshalJSON() ([]byte, error) { return b.json, nil }
 
 var _ json.Marshaler = brutos{}
 
+// livro:inicio inserir-job
+
+// inserirJob enfileira o job do corpo e responde com ele. Os argumentos
+// já chegam em JSON válido — o decodificador conferiu —, e seguem como
+// estão até o banco; a resposta é o job que acabou de ser gravado, sem
+// lê-lo de volta. Cada cópia a menos de args é uma a menos por
+// requisição (Cap. 29).
 func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 	var n NovoJob
 	if err := ler(r, &n); err != nil {
@@ -35,20 +44,6 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 			"%w: queue e kind são obrigatórios", errEntrada))
 		return
 	}
-	args := []byte(n.Args)
-	if len(args) == 0 {
-		args = []byte("{}")
-	}
-	opts := []enxame.Option{enxame.Queue(n.Queue)}
-	if n.UniqueKey != "" {
-		opts = append(opts, enxame.UniqueKey(n.UniqueKey))
-	}
-	if n.OrderingKey != "" {
-		opts = append(opts, enxame.OrderingKey(n.OrderingKey))
-	}
-	if !n.RunAt.IsZero() {
-		opts = append(opts, enxame.RunAt(n.RunAt))
-	}
 	cheia, err := a.filaCheia(r.Context(), namespace(r.Context()))
 	if err != nil {
 		a.erro(w, r, err)
@@ -58,19 +53,43 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 		recusarFilaCheia(w)
 		return
 	}
-	c := enxame.New(a.DB, namespace(r.Context()))
-	jid, err := c.Insert(r.Context(), brutos{n.Kind, args}, opts...)
+	j, evs, err := novoJob(namespace(r.Context()), n)
+	if err != nil {
+		a.erro(w, r, fmt.Errorf("%w: %w", errEntrada, err))
+		return
+	}
+	ctx := r.Context()
+	err = pgx.BeginFunc(ctx, a.DB, func(tx pgx.Tx) error {
+		return a.Store.InsertTx(ctx, tx, j, evs)
+	})
 	if err != nil {
 		a.erro(w, r, err)
 		return
 	}
-	j, err := a.buscarJob(r.Context(), jid)
-	if err != nil {
-		a.erro(w, r, err)
-		return
-	}
-	escrever(w, http.StatusCreated, j)
+	escrever(w, http.StatusCreated, paraJob(j))
 }
+
+// novoJob monta o job e o evento de criação. Os instantes vão com a
+// precisão do banco, o microssegundo, para a resposta ser o que uma
+// leitura devolveria.
+func novoJob(ns string, n NovoJob) (job.Job, []job.Event, error) {
+	args := []byte(n.Args)
+	if len(args) == 0 {
+		args = []byte("{}")
+	}
+	spec := job.Spec{ID: id.JobID(uuid.NewV7()), Namespace: ns,
+		Queue: n.Queue, Kind: n.Kind, Args: args,
+		UniqueKey: n.UniqueKey, OrderingKey: n.OrderingKey,
+		RunAt: n.RunAt.Round(time.Microsecond)}
+	evs, j, err := job.Insert(spec, time.Now().Round(time.Microsecond))
+	if err != nil {
+		return job.Job{}, nil, err
+	}
+	j, err = job.ApplyAll(j, evs)
+	return j, evs, err
+}
+
+// livro:fim inserir-job
 
 // buscarJob lê o job, e o esconde de quem é de outro namespace.
 func (a *API) buscarJob(ctx context.Context, s string) (Job, error) {

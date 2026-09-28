@@ -213,11 +213,14 @@ func traduzir(err error) error {
 	return err
 }
 
-func args(a []byte) string {
+// args entrega o JSON ao driver como bytes: para uma coluna jsonb, o
+// pgx manda os bytes como estão, sem a cópia de uma conversão para
+// string (Cap. 29).
+func args(a []byte) []byte {
 	if len(a) == 0 {
-		return "{}"
+		return []byte("{}")
 	}
-	return string(a)
+	return a
 }
 
 func nulo(s string) *string {
