@@ -49,6 +49,7 @@ func main() {
 	otlp := fs.String("otlp", "", "coletor OTLP/HTTP")
 	api := fs.String("api", "http://127.0.0.1:8080", "API do enxamed")
 	taxa := fs.Int("taxa", 5, "pedidos por segundo")
+	met := fs.String("metricas", ":9092", "/metrics do worker")
 	_ = fs.Parse(os.Args[2:])
 	ctx, parar := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
@@ -61,7 +62,7 @@ func main() {
 		defer func() { _ = desligar(context.WithoutCancel(ctx)) }()
 		switch os.Args[1] {
 		case "worker":
-			err = trabalhar(ctx, *dsn)
+			err = trabalhar(ctx, *dsn, *met)
 		case "carga":
 			err = carga(ctx, *api, *taxa)
 		}
@@ -96,12 +97,17 @@ func cobrar(log *slog.Logger) enxame.Handler {
 
 // livro:fim handler-incidente
 
-func trabalhar(ctx context.Context, dsn string) error {
+func trabalhar(ctx context.Context, dsn, met string) error {
 	db, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	// No modo biblioteca, as tentativas são contadas neste processo.
+	srv := &http.Server{Addr: met, Handler: enxame.MetricsHandler(),
+		ReadHeaderTimeout: time.Second}
+	go func() { _ = srv.ListenAndServe() }()
+	defer func() { _ = srv.Close() }()
 	log := slog.New(logging.Correlacao{
 		Handler: slog.NewJSONHandler(os.Stderr, nil)})
 	w := enxame.New(db, "loja").NewWorker(enxame.WorkerConfig{
