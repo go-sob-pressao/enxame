@@ -9,3 +9,4 @@ coverage.*
 __debug_bin*
 test/simulation/failures/
 test/chaos/testdata/
+missoes/07-tres-da-manha/telemetria/
