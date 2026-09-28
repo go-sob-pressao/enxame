@@ -24,6 +24,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/delivery"
 	"github.com/go-sob-pressao/enxame/internal/engine/partition"
 	"github.com/go-sob-pressao/enxame/internal/observ"
+	"github.com/go-sob-pressao/enxame/internal/observ/metrics"
 	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	tgrpc "github.com/go-sob-pressao/enxame/internal/transport/grpc"
@@ -47,6 +48,7 @@ type config struct {
 	relogio         func() time.Time // o relógio de parede do nó
 	diag            string           // endereço do pprof; vazio: não
 	otlp            string           // coletor OTLP/HTTP; vazio: não
+	metricas        string           // endereço do /metrics; vazio: não
 	amostragem      float64          // fração dos traces novos guardada
 	vooLimiar       time.Duration    // flight recorder; zero: desligado
 	vooDir          string
@@ -107,6 +109,25 @@ func servir(
 		Posses: posses, Intervalo: time.Second,
 		Drenagem: 30 * time.Second, Log: log}
 	g.Go(func() error { return reb.Run(ctx) })
+	if c.metricas != "" {
+		metrics.RegistrarPool(db)
+		metrics.RegistrarFilas(db)
+		metrics.RegistrarCluster(
+			func() int { return len(posses.Tokens()) },
+			func() bool {
+				l, _ := coord.Leader(context.WithoutCancel(ctx))
+				return l == no
+			}, func() uint64 {
+				a, _ := coord.Assignment(context.WithoutCancel(ctx))
+				return a.Epoch
+			})
+		var lc net.ListenConfig
+		lisMet, err := lc.Listen(ctx, "tcp", c.metricas)
+		if err != nil {
+			return err
+		}
+		g.Go(func() error { return metrics.Servir(ctx, lisMet) })
+	}
 	sd := s.ComDono(postgres.Dono{Tokens: posses.Tokens,
 		Perdeu: posses.Largar})
 

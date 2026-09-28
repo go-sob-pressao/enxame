@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
 	"github.com/go-sob-pressao/enxame/internal/core/job"
+	"github.com/go-sob-pressao/enxame/internal/observ/metrics"
 	"github.com/go-sob-pressao/enxame/internal/store"
 )
 
@@ -54,6 +55,10 @@ func (s *Store) Claim(
 		achou = true
 		return gravar(ctx, tx, reservado, evs, v)
 	})
+	if achou && err == nil {
+		metrics.JobReservado(reservado.Queue, reservado.ScheduledAt,
+			reservado.AttemptedAt)
+	}
 	return reservado, achou, err
 }
 
@@ -113,6 +118,10 @@ func (s *Store) claimDoDono(
 		s.dono.Perdeu(particao)
 		return job.Job{}, false, nil
 	}
+	if achou && err == nil {
+		metrics.JobReservado(reservado.Queue, reservado.ScheduledAt,
+			reservado.AttemptedAt)
+	}
 	return reservado, achou, err
 }
 
@@ -141,7 +150,7 @@ func (s *Store) Decide(
 	jid id.JobID,
 	decidir func(job.Job) ([]job.Event, error),
 ) (job.Job, error) {
-	var novo job.Job
+	var antes, novo job.Job
 	err := s.transacao(ctx, func(tx pgx.Tx) error {
 		j, v, err := ler(tx.QueryRow(ctx,
 			`SELECT `+colunas+` FROM job WHERE job_id = $1 FOR UPDATE`,
@@ -149,6 +158,7 @@ func (s *Store) Decide(
 		if err != nil {
 			return err
 		}
+		antes = j
 		evs, err := decidir(j)
 		if err != nil {
 			return err
@@ -158,7 +168,31 @@ func (s *Store) Decide(
 		}
 		return gravar(ctx, tx, novo, evs, v)
 	})
+	if err == nil {
+		anotarFim(antes, novo)
+	}
 	return novo, err
+}
+
+// anotarFim conta o fim de uma tentativa: um job que estava rodando e
+// deixou de estar.
+func anotarFim(antes, depois job.Job) {
+	if antes.State != job.StateRunning ||
+		depois.State == job.StateRunning {
+		return
+	}
+	resultado := "retry"
+	switch depois.State {
+	case job.StateCompleted:
+		resultado = "concluido"
+	case job.StateDiscarded, job.StateCancelled:
+		resultado = "descartado"
+	}
+	fim := depois.FinalizedAt
+	if fim.IsZero() {
+		fim = time.Now()
+	}
+	metrics.JobTerminou(depois.Queue, resultado, antes.AttemptedAt, fim)
 }
 
 // Promote torna disponíveis, em lotes de até 100, os jobs agendados ou

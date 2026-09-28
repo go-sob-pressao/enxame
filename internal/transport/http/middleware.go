@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sob-pressao/enxame/internal/observ/metrics"
 	"github.com/go-sob-pressao/enxame/internal/observ/tracing"
 )
 
@@ -110,11 +111,13 @@ func (a *API) Registrar(prox http.Handler) http.Handler {
 		rota := new(string)
 		ctx := context.WithValue(r.Context(), chaveRota{}, rota)
 		prox.ServeHTTP(rw, r.WithContext(ctx))
+		d := time.Since(inicio)
+		metrics.Requisicao(*rota, rw.status, d)
 		a.Log.InfoContext(r.Context(), "http",
 			slog.String("metodo", r.Method),
 			slog.String("rota", *rota),
 			slog.Int("status", rw.status),
-			slog.Duration("duracao", time.Since(inicio)))
+			slog.Duration("duracao", d))
 	})
 }
 

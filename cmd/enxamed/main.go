@@ -77,6 +77,9 @@ func executar(args []string, saida, erros io.Writer) int {
 	fs.StringVar(&c.otlp, "otlp", os.Getenv("ENXAME_OTLP"),
 		"coletor OTLP/HTTP dos traces, ex. localhost:4318 (vazio: "+
 			"sem traces)")
+	fs.StringVar(&c.metricas, "metricas", "",
+		"endereço do /metrics do Prometheus, ex. :9090 (vazio: "+
+			"desligado)")
 	fs.Float64Var(&c.amostragem, "amostragem", 1,
 		"fração dos traces novos que é guardada, de 0 a 1")
 	fs.StringVar(&c.diag, "diag", "",
