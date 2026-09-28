@@ -55,16 +55,21 @@ func IniciarJob(ctx context.Context,
 // livro:inicio requisicao
 
 // IniciarRequisicao abre o span de servidor de uma requisição HTTP,
-// filho do traceparent que o cliente mandou, se mandou. O nome é a
-// rota, não o caminho: /v1/jobs/{id}, e não um nome por job.
+// filho do traceparent que o cliente mandou, se mandou. O nome só é
+// conhecido depois que o roteador escolhe a rota — /v1/jobs/{id}, e não
+// um nome por job —, e por isso chega no fim, com o status.
 func IniciarRequisicao(ctx context.Context, h http.Header,
-	rota string) (context.Context, func(status int)) {
+	metodo string) (context.Context, func(rota string, status int)) {
 	ctx = otel.GetTextMapPropagator().Extract(ctx,
 		propagation.HeaderCarrier(h))
 	//nolint:spancheck // quem chama encerra, pela função devolvida
-	ctx, span := otel.Tracer(nome).Start(ctx, rota,
+	ctx, span := otel.Tracer(nome).Start(ctx, metodo,
 		trace.WithSpanKind(trace.SpanKindServer))
-	return ctx, func(status int) { //nolint:spancheck // End abaixo
+	//nolint:spancheck // End abaixo
+	return ctx, func(rota string, status int) {
+		if rota != "" {
+			span.SetName(rota)
+		}
 		span.SetAttributes(
 			attribute.Int("http.response.status_code", status))
 		if status >= 500 {

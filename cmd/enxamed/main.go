@@ -21,6 +21,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/go-sob-pressao/enxame/internal/observ/logging"
 )
 
 // versao é preenchida no build: -ldflags "-X main.versao=v1.2.3".
@@ -114,7 +116,8 @@ func executar(args []string, saida, erros io.Writer) int {
 	ctx, parar := signal.NotifyContext(context.Background(),
 		syscall.SIGTERM, os.Interrupt)
 	defer parar()
-	log := slog.New(slog.NewJSONHandler(erros, nil))
+	log := slog.New(logging.Correlacao{
+		Handler: slog.NewJSONHandler(erros, nil)})
 	var lc net.ListenConfig
 	lisHTTP, err := lc.Listen(ctx, "tcp", c.http)
 	if err == nil {

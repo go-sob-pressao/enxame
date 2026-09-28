@@ -110,10 +110,16 @@ func (a *API) Registrar(prox http.Handler) http.Handler {
 		// o handler, lá dentro; anotarRota o devolve por aqui.
 		rota := new(string)
 		ctx := context.WithValue(r.Context(), chaveRota{}, rota)
+		fim := func(string, int) {}
+		if strings.HasPrefix(r.URL.Path, "/v1/") { // a saúde fica fora
+			ctx, fim = tracing.IniciarRequisicao(ctx, r.Header,
+				r.Method)
+		}
 		prox.ServeHTTP(rw, r.WithContext(ctx))
 		d := time.Since(inicio)
+		fim(*rota, rw.status)
 		metrics.Requisicao(*rota, rw.status, d)
-		a.Log.InfoContext(r.Context(), "http",
+		a.Log.InfoContext(ctx, "http",
 			slog.String("metodo", r.Method),
 			slog.String("rota", *rota),
 			slog.Int("status", rw.status),
@@ -141,18 +147,5 @@ func anotarRota(prox http.Handler) http.Handler {
 			*rota = r.Pattern
 		}
 		prox.ServeHTTP(w, r)
-	})
-}
-
-// rastrear abre o span de servidor da rota; as públicas (saúde,
-// especificação) ficam de fora, para o trace não virar ruído.
-func rastrear(rota string, prox http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter,
-		r *http.Request) {
-		ctx, fim := tracing.IniciarRequisicao(r.Context(), r.Header,
-			rota)
-		rw := &comStatus{ResponseWriter: w, status: http.StatusOK}
-		prox.ServeHTTP(rw, r.WithContext(ctx))
-		fim(rw.status)
 	})
 }

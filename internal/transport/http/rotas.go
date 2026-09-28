@@ -73,7 +73,6 @@ func (a *API) Handler() http.Handler {
 			if a.Lentas != nil { // o long-poll é lento por desenho
 				h = exceto(emEspera, a.Lentas)(h)
 			}
-			h = rastrear(r.Padrao, h)
 		}
 		h = anotarRota(h)
 		mux.Handle(r.Padrao, h)
