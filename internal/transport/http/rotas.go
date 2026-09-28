@@ -70,6 +70,9 @@ func (a *API) Handler() http.Handler {
 		var h http.Handler = r.handler
 		if !r.Publica {
 			h = Encadear(h, protecao...)
+			if a.Lentas != nil { // o long-poll é lento por desenho
+				h = exceto(emEspera, a.Lentas)(h)
+			}
 		}
 		h = anotarRota(h)
 		mux.Handle(r.Padrao, h)

@@ -69,6 +69,11 @@ func executar(args []string, saida, erros io.Writer) int {
 		"posse de cada partição sem renovação")
 	fs.StringVar(&c.no, "no", "",
 		"nome deste nó no cluster (padrão: máquina-pid)")
+	fs.DurationVar(&c.vooLimiar, "voo-limiar", 0,
+		"grava o trace dos últimos 10 s quando uma requisição passa "+
+			"disto (0: desligado)")
+	fs.StringVar(&c.vooDir, "voo-dir", os.TempDir(),
+		"diretório dos traces do flight recorder")
 	fs.StringVar(&c.diag, "diag", "",
 		"endereço dos perfis do pprof (desligado se vazio; use "+
 			"127.0.0.1:6060)")

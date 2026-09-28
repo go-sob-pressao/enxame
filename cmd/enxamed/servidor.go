@@ -23,6 +23,7 @@ import (
 	"github.com/go-sob-pressao/enxame/internal/core/schedule"
 	"github.com/go-sob-pressao/enxame/internal/delivery"
 	"github.com/go-sob-pressao/enxame/internal/engine/partition"
+	"github.com/go-sob-pressao/enxame/internal/observ"
 	"github.com/go-sob-pressao/enxame/internal/store/postgres"
 	tgrpc "github.com/go-sob-pressao/enxame/internal/transport/grpc"
 	enxamev1 "github.com/go-sob-pressao/enxame/internal/transport/grpc/gen/enxame/v1"
@@ -44,6 +45,8 @@ type config struct {
 	leaseMotor      time.Duration
 	relogio         func() time.Time // o relógio de parede do nó
 	diag            string           // endereço do pprof; vazio: não
+	vooLimiar       time.Duration    // flight recorder; zero: desligado
+	vooDir          string
 }
 
 // livro:inicio servir
@@ -114,6 +117,15 @@ func servir(
 			return ""
 		}}
 	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
+	if c.vooLimiar > 0 {
+		v := &observ.Voo{Limiar: c.vooLimiar, Dir: c.vooDir,
+			Intervalo: time.Minute, Log: log}
+		if err := v.Ligar(); err != nil {
+			return err
+		}
+		defer v.Desligar()
+		a.Lentas = v.Middleware
+	}
 	a.Fila = api.Fila{Max: c.naFila, Validade: time.Second}
 	g.Go(func() error {
 		return a.Servir(ctx, lisHTTP,
