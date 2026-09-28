@@ -3,7 +3,7 @@
 Quarenta itens, quatro por degrau da escada *Compila ≠ Está correto*
 (Capítulo 31). Cada item é verificável: um comando, um teste ou um
 arquivo que diz sim ou não. A coluna "Enxame" é o estado na tag
-`cap-32`.
+`v1.0.0`.
 
 | # | Degrau | Item | Como se verifica | Enxame |
 |---|---|---|---|---|

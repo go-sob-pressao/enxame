@@ -51,8 +51,16 @@ make build       # bin/enxamed e bin/enxamectl
 make check       # lint + arquitetura + testes com -race
 ```
 
-O servidor ganha seus papéis a partir do Capítulo 2; até lá, `enxamed` apenas
-informa em que ponto do livro está.
+A `v1.0.0` é a versão do fim do livro; as mudanças estão em
+[CHANGELOG.md](CHANGELOG.md), com o que a compatibilidade cobre.
+
+## Em produção
+
+- `deploy/k8s/` — o `StatefulSet` e os overlays `dev` (kind) e `prod`;
+  `deploy/helm/enxame` — o mesmo, em chart
+- `docs/checklist-producao.md` — os 40 itens, e o estado do Enxame em cada um
+- `docs/slo.md`, `docs/runbook/`, `docs/dono.md` — o que se promete, o que se
+  faz quando um alarme toca, e quem responde
 
 ## Verificações
 
@@ -68,7 +76,8 @@ make help        # todos os alvos
 
 - `docs/adr/` — decisões de arquitetura registradas
 - `docs/protocol/` — catálogo de eventos
-- `docs/runbook/` — procedimentos de operação
+- `docs/runbook/` — um runbook por alarme
+- `docs/postmortem/` — o modelo e um exemplo
 - `docs/mapa-capitulos.md` — o que cada capítulo constrói
 
 ## Licença

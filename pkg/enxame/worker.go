@@ -48,17 +48,25 @@ type Workflow func(
 
 // WorkerConfig configura o worker; os zeros têm padrão.
 type WorkerConfig struct {
-	Queues      map[string]int // fila → workers; {"default": 10}
-	RetryBase   time.Duration  // 1 s
-	RetryMax    time.Duration  // 10 min
-	RescueAfter time.Duration  // 5 min: prazo de uma tentativa órfã
-	Name        string         // hostname-pid
-	Log         *slog.Logger
+	Queues    map[string]int // fila → workers; {"default": 10}
+	RetryBase time.Duration  // 1 s
+	RetryMax  time.Duration  // 10 min
+	// AttemptTimeout é o prazo de cada tentativa (5 min); RescueAfter,
+	// quanto tempo sem resposta até uma tentativa ser dada por órfã e
+	// voltar à fila (AttemptTimeout + 1 min). O resgate precisa vir
+	// depois do prazo: Run recusa o contrário (Cap. 33).
+	AttemptTimeout time.Duration
+	RescueAfter    time.Duration
+	Name           string // hostname-pid
+	Log            *slog.Logger
 	// O breaker da entrega de webhooks, por endpoint: quantas falhas
 	// seguidas o abrem (5) e por quanto tempo fica aberto (1 min).
 	BreakerLimiar int
 	BreakerPausa  time.Duration
 }
+
+// ErrConfig é uma configuração que o worker se recusa a usar.
+var ErrConfig = errors.New("enxame: configuração inválida")
 
 // Worker executa jobs, avança workflows, dispara agendamentos e resgata
 // tentativas órfãs, no processo da aplicação.
@@ -76,7 +84,9 @@ func (c *Client) NewWorker(cfg WorkerConfig) *Worker {
 	}
 	cfg.RetryBase = cmp(cfg.RetryBase, time.Second)
 	cfg.RetryMax = cmp(cfg.RetryMax, 10*time.Minute)
-	cfg.RescueAfter = cmp(cfg.RescueAfter, 5*time.Minute)
+	cfg.AttemptTimeout = cmp(cfg.AttemptTimeout, 5*time.Minute)
+	cfg.RescueAfter = cmp(cfg.RescueAfter,
+		cfg.AttemptTimeout+time.Minute)
 	if cfg.Name == "" {
 		h, _ := os.Hostname()
 		cfg.Name = fmt.Sprintf("%s-%d", h, os.Getpid())
@@ -119,6 +129,12 @@ func (w *Worker) Workflow(tipo string, fn Workflow) {
 // órfãs — todos sob o mesmo errgroup, que cancela os outros quando um
 // falha.
 func (w *Worker) Run(ctx context.Context) error {
+	if w.cfg.RescueAfter <= w.cfg.AttemptTimeout {
+		return fmt.Errorf("%w: RescueAfter (%v) precisa ser maior "+
+			"que AttemptTimeout (%v): uma tentativa ainda no prazo "+
+			"seria resgatada e rodaria de novo", ErrConfig,
+			w.cfg.RescueAfter, w.cfg.AttemptTimeout)
+	}
 	s := w.c.store.RelogioDoBanco()
 	g, ctx := errgroup.WithContext(ctx)
 	filas := map[string]map[string]runner.Handler{}
@@ -145,7 +161,7 @@ func (w *Worker) Run(ctx context.Context) error {
 			Queue: postgres.NewFila(ctx, s), QueueName: q,
 			Handlers: hs, Concurrency: max(w.cfg.Queues[q], 2),
 			PollTimeout:    5 * time.Second,
-			AttemptTimeout: w.cfg.RescueAfter,
+			AttemptTimeout: w.cfg.AttemptTimeout,
 			Backoff: func(a int) time.Duration {
 				return retry.Delay(a, rand.Float64)
 			},

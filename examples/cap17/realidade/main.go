@@ -148,7 +148,8 @@ func trabalhar(ctx context.Context) error {
 	defer cancel()
 	go exemplo.Esperar(ctx, db, cancel)
 	w := enxame.New(db, namespace).NewWorker(enxame.WorkerConfig{
-		RescueAfter: 3 * time.Second, RetryBase: 100 * time.Millisecond,
+		AttemptTimeout: 2 * time.Second, RescueAfter: 3 * time.Second,
+		RetryBase: 100 * time.Millisecond,
 	})
 	w.Handle("tarefa", func(ctx context.Context, _ enxame.Job) error {
 		return efeito(ctx, db)
