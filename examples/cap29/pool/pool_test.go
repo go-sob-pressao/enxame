@@ -53,7 +53,10 @@ type modelo struct{ compilado [4096]byte }
 func TestPoolNaoECache(t *testing.T) {
 	for _, coletas := range []int{0, 1, 2} {
 		criados := 0
-		p := sync.Pool{New: func() any { criados++; return new(modelo) }}
+		p := sync.Pool{New: func() any {
+			criados++
+			return new(modelo)
+		}}
 		for range 1000 {
 			p.Put(new(modelo))
 		}
