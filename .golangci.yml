@@ -37,7 +37,7 @@ linters:
       kv-only: false
       attr-only: true          # slog.String(...), nunca pares soltos chave/valor
       no-global: all           # logger injetado, nunca slog.Info global
-      context: scope
+      context: all
   exclusions:
     presets: [std-error-handling]
     paths:

@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -57,6 +58,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil {
-		log.Error("pprof", slog.Any("erro", err))
+		log.ErrorContext(context.Background(), "pprof",
+			slog.Any("erro", err))
 	}
 }

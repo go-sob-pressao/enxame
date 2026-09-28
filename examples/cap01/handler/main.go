@@ -28,8 +28,9 @@ func main() {
 		Addr:              ":8080",
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Info("ouvindo", slog.String("addr", srv.Addr))
+	ctx := context.Background()
+	log.InfoContext(ctx, "ouvindo", slog.String("addr", srv.Addr))
 	if err := srv.ListenAndServe(); err != nil {
-		log.Error("servidor", slog.Any("erro", err))
+		log.ErrorContext(ctx, "servidor", slog.Any("erro", err))
 	}
 }

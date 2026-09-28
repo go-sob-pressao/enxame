@@ -9,6 +9,17 @@ gRPC dos workers (`buf breaking` na CI) e para o esquema do banco, que só
 muda por migrações do tipo expandir e depois contrair. O que está em
 `internal/` pode mudar em qualquer versão.
 
+## [1.0.1] — 2026-09-28
+
+### Mudado
+
+- O lint exige as variantes com `Context` do `slog` em todo o código
+  (`sloglint`, `context: all`), e não só onde há um `ctx` à vista: o
+  handler de logs pega o `trace_id` e o `job_id` de cada linha.
+- A linha "tentativa perdida" do pool passa a sair com o contexto da
+  tentativa, e com ele o `trace_id` — era a única do pool sem ele (a
+  Missão #7 do livro a mostra assim).
+
 ## [1.0.0] — 2026-09-28
 
 A primeira versão estável: o Enxame do fim do livro, marco a marco.

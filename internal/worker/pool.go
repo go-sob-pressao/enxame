@@ -223,7 +223,7 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 	// livro:fim observar-tentativa
 	p.executados.Add(1)
 	if errors.Is(err, heartbeat.ErrPerdida) {
-		return p.perdida(j, err)
+		return p.perdida(tentativa, j, err)
 	}
 	if err != nil {
 		p.falhas.Add(1)
@@ -231,7 +231,7 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 			p.panicos.Add(1)
 		}
 		agora := p.Now()
-		return p.registrar(j, p.Queue.Fail(
+		return p.registrar(tentativa, j, p.Queue.Fail(
 			j.ID,
 			j.Attempt,
 			agora,
@@ -240,7 +240,8 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 			agora.Add(p.espera(j.Attempt, err)),
 		))
 	}
-	return p.registrar(j, p.Queue.Complete(j.ID, j.Attempt, p.Now()))
+	return p.registrar(tentativa, j,
+		p.Queue.Complete(j.ID, j.Attempt, p.Now()))
 }
 
 // livro:inicio perdida
@@ -249,15 +250,23 @@ func (p *Pool) executar(ctx context.Context, j job.Job) error {
 // o job foi resgatado enquanto esta tentativa rodava, e já pertence a
 // outra. Não é um erro do pool — é o resgate funcionando —, e o pool
 // segue com os outros jobs.
-func (p *Pool) registrar(j job.Job, err error) error {
+func (p *Pool) registrar(
+	ctx context.Context,
+	j job.Job,
+	err error,
+) error {
 	if errors.Is(err, job.ErrInvalidTransition) {
-		return p.perdida(j, err)
+		return p.perdida(ctx, j, err)
 	}
 	return err
 }
 
-func (p *Pool) perdida(j job.Job, err error) error {
-	p.Log.Warn("tentativa perdida",
+func (p *Pool) perdida(
+	ctx context.Context,
+	j job.Job,
+	err error,
+) error {
+	p.Log.WarnContext(ctx, "tentativa perdida",
 		slog.String("job", j.ID.String()),
 		slog.Int("tentativa", j.Attempt), slog.Any("erro", err))
 	return nil

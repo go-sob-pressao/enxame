@@ -41,6 +41,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil {
-		log.Error("servidor", slog.Any("erro", err))
+		log.ErrorContext(context.Background(), "servidor",
+			slog.Any("erro", err))
 	}
 }
