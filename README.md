@@ -17,7 +17,7 @@ Sistemas Distribuídos e Engenharia de Produção**.
 | **Enfileiramento transacional** | `InsertTx` grava o job na mesma transação dos seus dados — sem dual-write |
 | **Agendamentos** | Cron com fuso horário e disparo único por janela, mesmo com troca de líder |
 | **Webhooks** | Entrega assinada (Standard Webhooks), ordem por endpoint, circuit breaker, registro de tentativas |
-| **Workflows** | Funções Go com passos memoizados: `Step`, `Sleep`, `WaitSignal` — sobrevivem a deploys |
+| **Workflows** | Funções Go com passos memoizados: `Step`, `Sleep`, `SideEffect`, `Now`, `Version` — sobrevivem a deploys |
 | **Cluster** | Partições com fencing token; coordenação por Postgres ou pelo Raft do livro |
 
 Dois modos de uso: **biblioteca** (os workers rodam dentro da sua aplicação,

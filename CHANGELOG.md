@@ -52,5 +52,11 @@ A primeira versão estável: o Enxame do fim do livro, marco a marco.
   `ErrSemVisao` em vez de "só eu", e um líder recém-reiniciado não grava
   mais um mapa com todas as partições para si (Cap. 32).
 
+### Fora desta versão
+
+- Sinais externos para workflows: a tabela `workflow_signal` existe
+  desde a migração 0004, reservada; a API (`WaitSignal`) não. O
+  `README` e a documentação do pacote deixaram de anunciá-la.
+
 As versões anteriores não foram publicadas como versões: são as tags
 `cap-NN`, uma por capítulo do livro.
