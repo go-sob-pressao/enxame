@@ -29,7 +29,8 @@ import (
 // O trace atravessa o banco. Um job criado por uma requisição com
 // traceparent roda, noutro momento e noutra goroutine, como um span do
 // mesmo trace; e os três passos de um workflow, cada um um job
-// enfileirado pelo anterior, ficam todos no trace de quem iniciou o run.
+// enfileirado pelo anterior, ficam todos no trace de quem iniciou o
+// run.
 func TestTraceAtravessaOBanco(t *testing.T) {
 	gravador := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(
@@ -60,7 +61,8 @@ func TestTraceAtravessaOBanco(t *testing.T) {
 
 	w := c.NewWorker(enxame.WorkerConfig{
 		Queues: map[string]int{"default": 2}})
-	w.Handle("eco", func(context.Context, enxame.Job) error { return nil })
+	w.Handle("eco",
+		func(context.Context, enxame.Job) error { return nil })
 	w.Workflow("tres-passos", func(wc *workflow.Context,
 		_ json.RawMessage) (any, error) {
 		for _, p := range []string{"reservar", "cobrar", "enviar"} {
