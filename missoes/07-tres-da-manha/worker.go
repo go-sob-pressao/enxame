@@ -10,21 +10,21 @@ import (
 	"github.com/go-sob-pressao/enxame/pkg/enxame"
 )
 
-// livro:inicio missao-07
+// livro:inicio missao-07-gabarito
 
-// Config é a configuração do worker de relatórios, como ficou no deploy
-// das 2h50. O plantão da semana anterior tinha reclamado que, depois de
-// uma queda do worker, os relatórios órfãos levavam cinco minutos para
-// voltar à fila; o prazo de resgate foi encurtado.
+// Config é a configuração do worker de relatórios. O RescueAfter é
+// também o prazo de cada tentativa: um relatório leva três segundos no
+// ERP, e o prazo tem de ser maior que o relatório mais lento, com folga
+// — não o tempo que se gostaria de esperar para resgatar um órfão.
 func Config(log *slog.Logger) enxame.WorkerConfig {
 	return enxame.WorkerConfig{
 		Queues:      map[string]int{"relatorios": 4},
-		RescueAfter: 2 * time.Second, // era 5 min, o padrão
+		RescueAfter: 5 * time.Minute,
 		Log:         log,
 	}
 }
 
-// livro:fim missao-07
+// livro:fim missao-07-gabarito
 
 // Relatorio monta o relatório de fechamento de um cliente: consulta o
 // ERP, que leva cerca de três segundos, e grava o resultado.
