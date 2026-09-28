@@ -43,6 +43,7 @@ type config struct {
 	no              string
 	leaseMotor      time.Duration
 	relogio         func() time.Time // o relógio de parede do nó
+	diag            string           // endereço do pprof; vazio: não
 }
 
 // livro:inicio servir
@@ -142,6 +143,14 @@ func servir(
 				return entregar(ctx, sd, d, c.relogio, log)
 			})
 	})
+	if c.diag != "" {
+		var lc net.ListenConfig
+		lisDiag, err := lc.Listen(ctx, "tcp", c.diag)
+		if err != nil {
+			return err
+		}
+		g.Go(func() error { return diagnosticar(ctx, lisDiag, log) })
+	}
 	log.InfoContext(ctx, "enxamed no ar",
 		slog.String("http", lisHTTP.Addr().String()),
 		slog.String("grpc", lisGRPC.Addr().String()))

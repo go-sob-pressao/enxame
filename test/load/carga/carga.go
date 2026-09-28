@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -42,6 +43,7 @@ type Gerador struct {
 	URL, Token string
 	MaxEmVoo   int
 	Conexoes   int
+	Corpo      []byte // nil: um job de argumentos vazios
 	cliente    *http.Client
 }
 
@@ -97,9 +99,22 @@ func (g *Gerador) Executar(ctx context.Context, fs []Fase) []Resultado {
 
 var corpo = []byte(`{"queue":"carga","kind":"eco","args":{}}`)
 
+func (g *Gerador) corpo() []byte {
+	if g.Corpo == nil {
+		return corpo
+	}
+	return g.Corpo
+}
+
+// CorpoCom devolve um job cujos argumentos têm n bytes de dados.
+func CorpoCom(n int) []byte {
+	return []byte(`{"queue":"carga","kind":"eco","args":{"dados":"` +
+		strings.Repeat("x", n) + `"}}`)
+}
+
 func (g *Gerador) enviar(ctx context.Context) int {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.URL,
-		bytes.NewReader(corpo))
+		bytes.NewReader(g.corpo()))
 	if err != nil {
 		return 0
 	}

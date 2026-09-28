@@ -30,6 +30,7 @@ func main() {
 	conexoes := flag.Int("conexoes", 512, "conexões TCP com a API")
 	csv := flag.String("csv", "", "linha do tempo por segundo")
 	brutos := flag.String("brutos", "", "uma linha por requisição")
+	tamanho := flag.Int("bytes", 0, "bytes de dados nos argumentos")
 	flag.Parse()
 	fs, err := lerFases(*fases)
 	if err != nil {
@@ -38,6 +39,9 @@ func main() {
 	}
 	g := carga.Gerador{URL: *url + "/v1/jobs", Token: *token,
 		MaxEmVoo: *emVoo, Conexoes: *conexoes}
+	if *tamanho > 0 {
+		g.Corpo = carga.CorpoCom(*tamanho)
+	}
 	rs := g.Executar(context.Background(), fs)
 	carga.Resumir(os.Stdout, rs)
 	if *csv != "" {

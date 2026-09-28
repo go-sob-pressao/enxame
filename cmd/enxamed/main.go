@@ -69,6 +69,9 @@ func executar(args []string, saida, erros io.Writer) int {
 		"posse de cada partição sem renovação")
 	fs.StringVar(&c.no, "no", "",
 		"nome deste nó no cluster (padrão: máquina-pid)")
+	fs.StringVar(&c.diag, "diag", "",
+		"endereço dos perfis do pprof (desligado se vazio; use "+
+			"127.0.0.1:6060)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
