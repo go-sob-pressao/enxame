@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1
 
-# livro:inicio dockerfile
 # Versões fixadas: a imagem de build acompanha o go.mod (Cap. 31).
 FROM golang:1.27.1-trixie AS build
 WORKDIR /src
@@ -25,4 +24,3 @@ USER nonroot:nonroot
 # 7233 gRPC (workers e nós) · 8080 API HTTP · 9090 métricas e pprof
 EXPOSE 7233 8080 9090
 ENTRYPOINT ["/enxamed"]
-# livro:fim dockerfile
