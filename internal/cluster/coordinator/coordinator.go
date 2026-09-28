@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/go-sob-pressao/enxame/internal/core/id"
@@ -24,8 +25,13 @@ type Assignment struct {
 	Owners []NodeID
 }
 
+// ErrSemVisao é a resposta de um Membership que ainda não olhou o
+// cluster: "só eu" seria uma resposta falsa (Cap. 32).
+var ErrSemVisao = errors.New("coordinator: membership ainda sem visão")
+
 // Membership responde quem está no cluster, na visão deste nó: ele
-// mesmo e os que ele não dá por mortos.
+// mesmo e os que ele não dá por mortos — ou ErrSemVisao, antes da
+// primeira leitura.
 type Membership interface {
 	Members(ctx context.Context) ([]NodeID, error)
 }

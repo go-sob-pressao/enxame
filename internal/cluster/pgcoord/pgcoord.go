@@ -132,6 +132,9 @@ func (c *Coord) redistribuir(ctx context.Context, termo int64) error {
 			return nil // perdemos a liderança no caminho
 		}
 		vivos, err := c.cfg.Membros.Members(ctx)
+		if errors.Is(err, coordinator.ErrSemVisao) {
+			return nil // o próximo ciclo decide, já com a visão
+		}
 		if err != nil {
 			return err
 		}

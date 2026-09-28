@@ -46,6 +46,7 @@ type Membro struct {
 	mu     sync.Mutex
 	outros map[coordinator.NodeID]*observado
 	agora  time.Time // now() do banco na última leitura
+	viu    bool      // já leu a tabela inteira ao menos uma vez
 }
 
 // Novo cria o membership do nó; Run o põe para bater.
@@ -128,7 +129,11 @@ func (m *Membro) ciclo(ctx context.Context) error {
 		}
 		o.endereco, m.agora = end, agora
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	m.viu = true
+	return nil
 }
 
 // livro:fim membro
@@ -137,9 +142,18 @@ func (m *Membro) ciclo(ctx context.Context) error {
 func (m *Membro) No() coordinator.NodeID { return m.cfg.No }
 
 // Members devolve este nó e os que ele não dá por mortos, em ordem.
+// Antes da primeira leitura da tabela, não sabe — e diz que não sabe:
+// um nó que acabou de subir e respondesse "só eu" levaria um líder a
+// dar todas as partições a um nó só (Cap. 32).
 func (m *Membro) Members(
 	context.Context,
 ) ([]coordinator.NodeID, error) {
+	m.mu.Lock()
+	viu := m.viu
+	m.mu.Unlock()
+	if !viu {
+		return nil, coordinator.ErrSemVisao
+	}
 	ids := []coordinator.NodeID{m.cfg.No}
 	for _, s := range m.Visao() {
 		if s.Estado != Morto {
