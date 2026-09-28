@@ -19,3 +19,15 @@ fazer, como saber que passou e quem chamar.
 Os comandos supõem o Enxame instalado pelo `deploy/k8s` no namespace
 corrente e `ENXAME_DB_DSN` com o DSN do banco. O dono do sistema, o
 plantão e a escala estão em `docs/dono.md`.
+
+A imagem do `enxamed` não tem shell. Para olhar de dentro de um pod —
+processos, rede, o `/statusz` pelo `localhost` —, um contêiner de
+depuração efêmero, com o mesmo usuário sem privilégios do pod:
+
+```sh
+kubectl debug enxame-0 -it --image=busybox:1.37 --target=enxamed \
+  --profile=restricted --custom=deploy/k8s/depurar.json -- sh
+```
+
+Sem o `--custom`, o busybox rodaria como root, e o pod — que exige
+`runAsNonRoot` — o recusaria.

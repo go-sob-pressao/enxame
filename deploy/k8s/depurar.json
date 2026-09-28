@@ -1,0 +1,8 @@
+{
+  "securityContext": {
+    "runAsUser": 65532,
+    "runAsNonRoot": true,
+    "allowPrivilegeEscalation": false,
+    "capabilities": {"drop": ["ALL"]}
+  }
+}
