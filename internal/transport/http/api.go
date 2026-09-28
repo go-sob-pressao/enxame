@@ -29,6 +29,7 @@ type API struct {
 	Taxa, Rajada float64
 	MaxEmCurso   int
 	Fila         Fila
+	Kinds        []string   // os kinds aceitos; vazio: qualquer um
 	Lentas       Middleware // observa cada rota autenticada; nil: nada
 	Cluster      Cluster    // nil com um nó só
 	Rota         Roteador   // nil com um nó só

@@ -44,6 +44,11 @@ func (a *API) inserirJob(w http.ResponseWriter, r *http.Request) {
 			"%w: queue e kind são obrigatórios", errEntrada))
 		return
 	}
+	if !kindPermitido(a.Kinds, n.Kind) {
+		a.erro(w, r, fmt.Errorf("%w: kind %q não é aceito",
+			errEntrada, n.Kind))
+		return
+	}
 	cheia, err := a.filaCheia(r.Context(), namespace(r.Context()))
 	if err != nil {
 		a.erro(w, r, err)

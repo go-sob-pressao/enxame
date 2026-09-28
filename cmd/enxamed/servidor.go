@@ -47,6 +47,7 @@ type config struct {
 	diag            string           // endereço do pprof; vazio: não
 	vooLimiar       time.Duration    // flight recorder; zero: desligado
 	vooDir          string
+	kinds           []string // os kinds aceitos pela API; vazio: todos
 }
 
 // livro:inicio servir
@@ -117,6 +118,7 @@ func servir(
 			return ""
 		}}
 	a.Taxa, a.Rajada, a.MaxEmCurso = c.taxa, c.rajada, c.emCurso
+	a.Kinds = c.kinds
 	if c.vooLimiar > 0 {
 		v := &observ.Voo{Limiar: c.vooLimiar, Dir: c.vooDir,
 			Intervalo: time.Minute, Log: log}

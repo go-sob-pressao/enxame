@@ -74,6 +74,8 @@ func executar(args []string, saida, erros io.Writer) int {
 			"disto (0: desligado)")
 	fs.StringVar(&c.vooDir, "voo-dir", os.TempDir(),
 		"diretório dos traces do flight recorder")
+	kinds := fs.String("kinds", os.Getenv("ENXAME_KINDS"),
+		"kinds aceitos pela API, separados por vírgula (vazio: todos)")
 	fs.StringVar(&c.diag, "diag", "",
 		"endereço dos perfis do pprof (desligado se vazio; use "+
 			"127.0.0.1:6060)")
@@ -88,6 +90,9 @@ func executar(args []string, saida, erros io.Writer) int {
 	// livro:fim main-testavel
 	if *demo > 0 {
 		return demonstrar(*demo, saida, erros)
+	}
+	if *kinds != "" {
+		c.kinds = strings.Split(*kinds, ",")
 	}
 	var err error
 	if c.relogio, err = relogioDoNo(); err != nil {
